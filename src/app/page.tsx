@@ -18,6 +18,6 @@ export default function Home() {
       <ForTeachers />
       <Testimonials />
       <CTA />
-    </main>
+      </main>
   );
 }
