@@ -37,8 +37,8 @@ export default function PostJobPage() {
   };
 
   const handleGenerateDescription = async () => {
-    if (!formData.subject || !formData.level) {
-      alert("Please fill in at least Subject and Education Level before generating a description.");
+    if (!formData.subject) {
+      alert("Please select a Subject before generating a description.");
       return;
     }
 
@@ -232,8 +232,9 @@ export default function PostJobPage() {
                     <Button
                       type="button"
                       onClick={handleGenerateDescription}
-                      disabled={isGenerating || !formData.subject || !formData.level}
-                      className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-4 py-2 text-sm rounded-lg shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      disabled={isGenerating || !formData.subject}
+                      className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-4 py-2 text-sm rounded-lg shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-all"
+                      title={!formData.subject ? "Please select a Subject first" : "Generate job description using AI"}
                     >
                       <BsStars className="w-4 h-4" />
                       {isGenerating ? "Generating..." : "Generate with AI"}
@@ -248,9 +249,10 @@ export default function PostJobPage() {
                     required
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   />
-                  {!formData.subject || !formData.level ? (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Fill in Subject and Education Level to enable AI generation
+                  {!formData.subject ? (
+                    <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                      <span>💡</span>
+                      <span>Select a Subject above to enable AI generation</span>
                     </p>
                   ) : null}
                 </div>
