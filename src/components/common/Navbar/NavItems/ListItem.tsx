@@ -8,7 +8,7 @@ interface ListItemProps extends React.ComponentPropsWithoutRef<"li"> {
   titleClassName?: string;
   descriptionClassName?: string;
   className?: string;
-  Icon: React.ElementType;
+  Icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
 }
 
 function ListItem({
@@ -34,7 +34,7 @@ function ListItem({
           <div className="flex flex-row gap-4">
             <div className="w-[12%] pt-1">
               <div className="w-8 h-8 bg-navIconBackground rounded-[3px] flex justify-center items-center">
-                <Icon className="!w-5 !h-5" color="#242424" />
+                <Icon className="!w-5 !h-5 text-[#242424]" />
               </div>
             </div>
             <div className="w-[88%] flex flex-col gap-1">

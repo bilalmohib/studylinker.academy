@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import * as Sentry from "@sentry/nextjs";
 
 export default function ChunkErrorHandler() {
   useEffect(() => {
@@ -15,12 +14,15 @@ export default function ChunkErrorHandler() {
           error.toString().includes("ChunkLoadError") ||
           event.message?.includes("Failed to fetch dynamically imported module"))
       ) {
-        Sentry.captureException(error, {
-          tags: {
-            errorType: "chunk_load_error",
-            recoverable: true,
-          },
-        });
+        // Optional: Log to error tracking service if available
+        if (typeof window !== "undefined" && (window as any).Sentry) {
+          (window as any).Sentry.captureException(error, {
+            tags: {
+              errorType: "chunk_load_error",
+              recoverable: true,
+            },
+          });
+        }
 
         const retryDelay = 2000;
         const hasRetried = sessionStorage.getItem("chunkRetryAttempted") === "true";
@@ -49,12 +51,15 @@ export default function ChunkErrorHandler() {
           reason.toString().includes("ChunkLoadError") ||
           reason.toString().includes("Failed to fetch dynamically imported module"))
       ) {
-        Sentry.captureException(reason, {
-          tags: {
-            errorType: "chunk_load_error",
-            recoverable: true,
-          },
-        });
+        // Optional: Log to error tracking service if available
+        if (typeof window !== "undefined" && (window as any).Sentry) {
+          (window as any).Sentry.captureException(reason, {
+            tags: {
+              errorType: "chunk_load_error",
+              recoverable: true,
+            },
+          });
+        }
 
         const hasRetried = sessionStorage.getItem("chunkRetryAttempted") === "true";
 
