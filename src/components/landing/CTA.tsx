@@ -45,7 +45,7 @@ export default function CTA() {
               asChild
               size="lg"
               variant="outline"
-              className="border-2 border-white text-white hover:bg-white hover:text-indigo-600 px-8 py-6 text-lg rounded-full shadow-xl transition-all duration-300"
+              className="border-2 border-white hover:bg-white text-indigo-600 px-8 py-6 text-lg rounded-full shadow-xl transition-all duration-300"
             >
               <Link href="/teachers/apply">I'm a Teacher</Link>
             </Button>

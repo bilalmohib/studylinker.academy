@@ -1,91 +1,144 @@
-import { Metadata } from "next";
-import PageTemplate from "@/components/common/PageTemplate";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import { BsSearch, BsFilter, BsBriefcase } from "react-icons/bs";
+"use client";
 
-export const metadata: Metadata = {
-  title: "Find Students - Browse Job Postings | StudyLinker",
-  description:
-    "Browse tutoring job postings from parents and find students to teach. Apply to positions that match your expertise and availability.",
-  keywords: ["find students", "tutoring jobs", "job postings", "teach students"],
-  openGraph: {
-    title: "Find Students - StudyLinker",
-    description: "Browse job postings and find students to teach.",
+import { useState } from "react";
+import Container from "@/components/common/Container";
+import { BsSearch } from "react-icons/bs";
+import JobCard from "@/components/marketplace/JobCard";
+import FilterSidebar from "@/components/marketplace/FilterSidebar";
+
+// Mock data - replace with API calls later
+const mockJobs = [
+  {
+    id: "1",
+    title: "Mathematics Tutor Needed for O-Level Student",
+    subject: "Mathematics",
+    level: "O-Level",
+    studentAge: 16,
+    hoursPerWeek: "5-8",
+    budget: "$150-200",
+    postedDate: "2 days ago",
+    applications: 12,
+    status: "open" as const,
+    curriculum: true,
   },
-};
+  {
+    id: "2",
+    title: "Primary School English and Science Tutor",
+    subject: "English, Science",
+    level: "Primary School",
+    studentAge: 9,
+    hoursPerWeek: "3-5",
+    budget: "$100-150",
+    postedDate: "1 week ago",
+    applications: 8,
+    status: "open" as const,
+    curriculum: false,
+  },
+  {
+    id: "3",
+    title: "A-Level Physics and Chemistry Tutor",
+    subject: "Physics, Chemistry",
+    level: "A-Level",
+    studentAge: 17,
+    hoursPerWeek: "6-10",
+    budget: "$200-250",
+    postedDate: "3 days ago",
+    applications: 15,
+    status: "open" as const,
+    curriculum: true,
+  },
+  {
+    id: "4",
+    title: "Middle School Math Tutor",
+    subject: "Mathematics",
+    level: "Middle School",
+    studentAge: 13,
+    hoursPerWeek: "4-6",
+    budget: "$120-180",
+    postedDate: "5 days ago",
+    applications: 6,
+    status: "open" as const,
+  },
+];
 
 export default function FindStudentsPage() {
+  const [searchQuery, setSearchQuery] = useState("");
+
   return (
-    <PageTemplate
-      title="Find Students"
-      description="Browse job postings from parents and find students who need your expertise. Apply to positions that match your skills and availability."
-    >
-      <div className="space-y-8">
-        {/* Search and Filter Section */}
-        <div className="bg-white rounded-2xl p-6 shadow-lg">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 relative">
-              <BsSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Search by subject, level, or keywords..."
-                className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
-            </div>
-            <Button className="bg-indigo-600 hover:bg-indigo-700 text-white px-6">
-              <BsFilter className="w-5 h-5 mr-2" />
-              Filters
-            </Button>
-          </div>
-        </div>
-
-        {/* Info Section */}
-        <div className="bg-white rounded-2xl p-8 shadow-lg">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            How to Find Students
-          </h2>
-          <div className="space-y-4 text-gray-600">
-            <p>
-              Our job marketplace connects you with parents looking for qualified
-              teachers. You can:
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-indigo-50 py-12">
+      <Container>
+        <div className="mb-8">
+          <div className="mb-6">
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">
+              Find Students
+            </h1>
+            <p className="text-xl text-gray-600">
+              Browse job postings from parents and find students who need your expertise
             </p>
-            <ul className="list-disc list-inside space-y-2 ml-4">
-              <li>Browse job postings by subject, education level, and schedule</li>
-              <li>View detailed requirements and student information</li>
-              <li>Apply with your proposed rates and availability</li>
-              <li>Chat with parents before accepting positions</li>
-              <li>Build your reputation through successful teaching</li>
-            </ul>
+          </div>
+
+          {/* Search Bar */}
+          <div className="bg-white rounded-2xl p-4 shadow-lg">
+            <div className="flex gap-4">
+              <div className="flex-1 relative">
+                <BsSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Search by subject, level, or keywords..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Coming Soon Notice */}
-        <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-2xl p-8 border-2 border-indigo-200">
-          <div className="flex items-center gap-4 mb-4">
-            <BsBriefcase className="w-8 h-8 text-indigo-600" />
-            <h3 className="text-2xl font-bold text-gray-900">
-              Job Marketplace Coming Soon
-            </h3>
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Filters Sidebar */}
+          <div className="lg:col-span-1">
+            <FilterSidebar type="jobs" />
           </div>
-          <p className="text-gray-700 mb-6">
-            We're building an amazing job marketplace experience. In the meantime,
-            you can:
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <Button
-              asChild
-              className="bg-indigo-600 hover:bg-indigo-700 text-white"
-            >
-              <Link href="/teachers/apply">Apply to Become a Teacher</Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href="/contact">Contact Us</Link>
-            </Button>
+
+          {/* Jobs Grid */}
+          <div className="lg:col-span-3">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">
+                {mockJobs.length} Jobs Available
+              </h2>
+              <select className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                <option>Sort by: Newest First</option>
+                <option>Sort by: Highest Budget</option>
+                <option>Sort by: Most Applications</option>
+                <option>Sort by: Fewest Applications</option>
+              </select>
+            </div>
+
+            <div className="space-y-4">
+              {mockJobs.map((job) => (
+                <JobCard key={job.id} {...job} />
+              ))}
+            </div>
+
+            {/* Pagination */}
+            <div className="flex items-center justify-center gap-2 mt-8">
+              <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                Previous
+              </button>
+              <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg">
+                1
+              </button>
+              <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                2
+              </button>
+              <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                Next
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    </PageTemplate>
+      </Container>
+    </div>
   );
 }
 
