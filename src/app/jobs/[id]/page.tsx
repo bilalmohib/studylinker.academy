@@ -165,25 +165,24 @@ export default function JobDetailsPage({
 
           {/* Apply Section */}
           {job.status === "open" && (
-            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-8 text-white">
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-8 text-white shadow-lg">
               <h2 className="text-2xl font-bold mb-4">Ready to Apply?</h2>
-              <p className="text-indigo-100 mb-6">
+              <p className="text-white/90 mb-6">
                 Submit your application with your proposed rate and availability. The
                 parent will review your profile and get in touch.
               </p>
-              <div className="flex gap-4">
+              <div className="flex flex-col sm:flex-row gap-4">
                 <Button
                   asChild
-                  className="bg-white text-indigo-600 hover:bg-gray-100 px-8 py-6 text-lg rounded-full"
+                  className="bg-white text-indigo-600 hover:bg-gray-100 font-semibold px-8 py-6 text-lg rounded-full"
                 >
                   <Link href={`/jobs/${id}/apply`}>Apply Now</Link>
                 </Button>
                 <Button
                   asChild
-                  variant="outline"
-                  className="border-2 border-white text-white hover:bg-white/10 px-8 py-6 text-lg rounded-full"
+                  className="border-2 border-white bg-transparent text-white hover:bg-white/10 font-semibold px-8 py-6 text-lg rounded-full"
                 >
-                  <Link href={`/jobs/${id}/contact`}>
+                  <Link href={`/jobs/${id}/contact`} className="flex items-center justify-center">
                     <BsChatDots className="w-5 h-5 mr-2" />
                     Message Parent
                   </Link>

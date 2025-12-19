@@ -18,7 +18,7 @@ import { menuItems } from "@/components/common/Navbar/NavItems/data";
 const NavItems = () => {
   return (
     <NavigationMenu viewport={false}>
-      <NavigationMenuList className="gap-2 xl:gap-6 xlg:flex-row flex-col">
+      <NavigationMenuList className="gap-2 xl:gap-6 flex-row">
         {menuItems.map((item) => (
           <NavigationMenuItem key={item.title}>
             {item.hasDropdown ? (

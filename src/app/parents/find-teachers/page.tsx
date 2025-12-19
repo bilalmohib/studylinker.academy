@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Metadata } from "next";
 import Container from "@/components/common/Container";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";

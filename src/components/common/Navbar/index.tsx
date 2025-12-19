@@ -43,16 +43,16 @@ function Navbar() {
             <Logo onClick={() => setIsMobileMenuOpen(false)} />
           </div>
 
-          <div className="hidden xlg:block">
+          <div className="hidden min-[1366px]:block">
             {isMounted ? <NavItems /> : <div aria-hidden="true" />}
           </div>
 
-          <div className="hidden xlg:block">
+          <div className="hidden min-[1366px]:block">
             <AuthButtons />
           </div>
 
           {/* Mobile menu button */}
-          <div className="xlg:hidden">
+          <div className="block min-[1366px]:hidden">
             <div className="flex flex-row gap-6">
               <AuthButtons />
               <button
@@ -87,7 +87,7 @@ function Navbar() {
 
       {/* Mobile menu with smooth animation */}
       <div
-        className={`xlg:hidden overflow-hidden transition-all duration-300 ease-in-out ${
+        className={`block min-[1366px]:hidden overflow-hidden transition-all duration-300 ease-in-out ${
           isMobileMenuOpen ? "max-h-[800px] opacity-100" : "max-h-0 opacity-0"
         }`}
       >
