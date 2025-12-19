@@ -1,0 +1,26 @@
+<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="appleBookGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366F1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4F46E5;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="appleLinkGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B5CF6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#7C3AED;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="180" height="180" rx="40" fill="url(#appleBookGradient)"/>
+  
+  <!-- Book Icon -->
+  <rect x="40" y="50" width="50" height="70" rx="8" fill="white" opacity="0.95"/>
+  <path d="M40 50L65 70L90 50" stroke="#6366F1" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <line x1="65" y1="70" x2="65" y2="110" stroke="#6366F1" stroke-width="6" stroke-linecap="round"/>
+  
+  <!-- Link/Connection Icon -->
+  <circle cx="120" cy="90" r="18" fill="url(#appleLinkGradient)"/>
+  <path d="M138 90L150 90" stroke="white" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="150" cy="90" r="12" fill="url(#appleLinkGradient)"/>
+</svg>
+

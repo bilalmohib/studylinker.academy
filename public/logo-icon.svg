@@ -1,0 +1,23 @@
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="iconBookGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366F1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4F46E5;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="iconLinkGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B5CF6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#7C3AED;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Book Icon -->
+  <rect x="4" y="6" width="16" height="24" rx="2" fill="url(#iconBookGradient)"/>
+  <path d="M4 6L12 12L20 6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="12" y1="12" x2="12" y2="28" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+  
+  <!-- Link/Connection Icon -->
+  <circle cx="28" cy="18" r="5" fill="url(#iconLinkGradient)"/>
+  <path d="M33 18L36 18" stroke="#8B5CF6" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="36" cy="18" r="3" fill="url(#iconLinkGradient)"/>
+</svg>
+
