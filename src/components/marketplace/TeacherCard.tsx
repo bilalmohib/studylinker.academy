@@ -34,19 +34,19 @@ export default function TeacherCard({
   avatar,
 }: TeacherCardProps) {
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100">
-      <div className="flex items-start gap-4 mb-4">
-        <div className="relative flex-shrink-0">
+    <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100">
+      <div className="flex items-start gap-3 sm:gap-4 mb-4">
+        <div className="relative shrink-0">
           {avatar ? (
             <Image
               src={avatar}
               alt={name}
               width={64}
               height={64}
-              className="w-16 h-16 rounded-full object-cover shadow-md"
+              className="w-12 h-12 sm:w-16 sm:h-16 rounded-full object-cover shadow-md"
             />
           ) : (
-            <div className="w-16 h-16 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center text-white text-2xl font-bold shadow-md">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center text-white text-lg sm:text-2xl font-bold shadow-md">
               {name.charAt(0).toUpperCase()}
             </div>
           )}
@@ -56,25 +56,27 @@ export default function TeacherCard({
             </div>
           )}
         </div>
-        <div className="flex-1">
-          <h3 className="text-xl font-bold text-gray-900 mb-1">{name}</h3>
-          <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
-            <BsGlobe className="w-4 h-4" />
-            <span>{location}</span>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-1 truncate">{name}</h3>
+          <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600 mb-2">
+            <BsGlobe className="w-3 h-3 sm:w-4 sm:h-4 shrink-0" />
+            <span className="truncate">{location}</span>
           </div>
-          <div className="flex items-center gap-1 mb-2">
-            {[...Array(5)].map((_, i) => (
-              <BsStarFill
-                key={i}
-                className={`w-4 h-4 ${
-                  i < Math.floor(rating)
-                    ? "text-yellow-400"
-                    : "text-gray-300"
-                }`}
-              />
-            ))}
-            <span className="ml-2 text-sm text-gray-600">
-              {rating} ({reviews} reviews)
+          <div className="flex items-center gap-1 mb-2 flex-wrap">
+            <div className="flex items-center gap-0.5">
+              {[...Array(5)].map((_, i) => (
+                <BsStarFill
+                  key={i}
+                  className={`w-3 h-3 sm:w-4 sm:h-4 ${
+                    i < Math.floor(rating)
+                      ? "text-yellow-400"
+                      : "text-gray-300"
+                  }`}
+                />
+              ))}
+            </div>
+            <span className="ml-1 sm:ml-2 text-xs sm:text-sm text-gray-600">
+              {rating} ({reviews})
             </span>
           </div>
         </div>
@@ -106,16 +108,16 @@ export default function TeacherCard({
         </div>
       </div>
 
-      <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t border-gray-200">
         <div>
-          <span className="text-2xl font-bold text-indigo-600">{rate}</span>
-          <span className="text-sm text-gray-600">/month</span>
+          <span className="text-xl sm:text-2xl font-bold text-indigo-600">{rate}</span>
+          <span className="text-xs sm:text-sm text-gray-600">/month</span>
         </div>
         <Button
           asChild
-          className="bg-indigo-600 hover:bg-indigo-700 text-white"
+          className="bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto text-sm sm:text-base"
         >
-          <Link href={`/teachers/${id}`}>View Profile</Link>
+          <Link href={`/teachers/${id}`} className="text-center">View Profile</Link>
         </Button>
       </div>
     </div>

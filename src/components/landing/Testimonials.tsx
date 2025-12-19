@@ -45,23 +45,23 @@ function TestimonialCard({
       initial={{ opacity: 0, y: 30 }}
       animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
       transition={{ duration: 0.5, delay: index * 0.1 }}
-      className="bg-white p-8 rounded-2xl shadow-lg hover:shadow-xl transition-shadow duration-300"
+      className="bg-white p-6 sm:p-8 rounded-2xl shadow-lg hover:shadow-xl transition-shadow duration-300"
     >
       <div className="flex gap-1 mb-4">
         {[...Array(testimonial.rating)].map((_, i) => (
-          <BsStarFill key={i} className="w-5 h-5 text-yellow-400" />
+          <BsStarFill key={i} className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-400" />
         ))}
       </div>
-      <p className="text-gray-700 text-lg mb-6 leading-relaxed">
+      <p className="text-gray-700 text-base sm:text-lg mb-6 leading-relaxed">
         "{testimonial.content}"
       </p>
-      <div className="flex items-center gap-4">
-        <div className="w-12 h-12 rounded-full bg-gradient-to-r from-indigo-400 to-purple-400 flex items-center justify-center text-2xl">
+      <div className="flex items-center gap-3 sm:gap-4">
+        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-r from-indigo-400 to-purple-400 flex items-center justify-center text-xl sm:text-2xl shrink-0">
           {testimonial.avatar}
         </div>
-        <div>
-          <div className="font-bold text-gray-900">{testimonial.name}</div>
-          <div className="text-gray-600 text-sm">{testimonial.role}</div>
+        <div className="min-w-0">
+          <div className="font-bold text-gray-900 text-sm sm:text-base truncate">{testimonial.name}</div>
+          <div className="text-gray-600 text-xs sm:text-sm truncate">{testimonial.role}</div>
         </div>
       </div>
     </motion.div>

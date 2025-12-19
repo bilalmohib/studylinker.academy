@@ -48,16 +48,16 @@ export default function ParentDashboardPage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-indigo-50 py-12">
       <Container>
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">
             Parent Dashboard
           </h1>
-          <p className="text-xl text-gray-600">
+          <p className="text-lg sm:text-xl text-gray-600">
             Manage your children's education and teachers
           </p>
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
           <Button
             asChild
             className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white p-6 rounded-2xl shadow-lg h-auto flex-col gap-2"
@@ -91,14 +91,14 @@ export default function ParentDashboardPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Active Jobs */}
-          <div className="bg-white rounded-2xl p-8 shadow-lg">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">Active Jobs</h2>
+          <div className="bg-white rounded-2xl p-4 sm:p-8 shadow-lg">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Active Jobs</h2>
               <Button
                 asChild
                 variant="outline"
                 size="sm"
-                className="border-indigo-600 text-indigo-600"
+                className="border-indigo-600 text-indigo-600 w-full sm:w-auto"
               >
                 <Link href="/parents/post-job">Post New</Link>
               </Button>
@@ -132,14 +132,14 @@ export default function ParentDashboardPage() {
           </div>
 
           {/* Hired Teachers */}
-          <div className="bg-white rounded-2xl p-8 shadow-lg">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">Hired Teachers</h2>
+          <div className="bg-white rounded-2xl p-4 sm:p-8 shadow-lg">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Hired Teachers</h2>
               <Button
                 asChild
                 variant="outline"
                 size="sm"
-                className="border-indigo-600 text-indigo-600"
+                className="border-indigo-600 text-indigo-600 w-full sm:w-auto"
               >
                 <Link href="/parents/find-teachers">Find More</Link>
               </Button>
@@ -177,8 +177,8 @@ export default function ParentDashboardPage() {
           </div>
 
           {/* Upcoming Classes */}
-          <div className="bg-white rounded-2xl p-8 shadow-lg">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">
+          <div className="bg-white rounded-2xl p-4 sm:p-8 shadow-lg">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6">
               Upcoming Classes
             </h2>
             <div className="space-y-4">
@@ -200,8 +200,8 @@ export default function ParentDashboardPage() {
           </div>
 
           {/* Recent Activity */}
-          <div className="bg-white rounded-2xl p-8 shadow-lg">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">
+          <div className="bg-white rounded-2xl p-4 sm:p-8 shadow-lg">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6">
               Recent Activity
             </h2>
             <div className="space-y-4">

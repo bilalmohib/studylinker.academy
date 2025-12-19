@@ -40,8 +40,8 @@ export default function FilterSidebar({ type, onFilterChange }: FilterSidebarPro
   ];
 
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-lg h-fit sticky top-4">
-      <h2 className="text-xl font-bold text-gray-900 mb-6">Filters</h2>
+    <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-lg h-fit lg:sticky lg:top-4">
+      <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 sm:mb-6">Filters</h2>
 
       {/* Subject Filter */}
       <div className="mb-6">

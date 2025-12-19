@@ -69,10 +69,10 @@ export default function FindStudentsPage() {
       <Container>
         <div className="mb-8">
           <div className="mb-6">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">
+            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">
               Find Students
             </h1>
-            <p className="text-xl text-gray-600">
+            <p className="text-lg sm:text-xl text-gray-600">
               Browse job postings from parents and find students who need your expertise
             </p>
           </div>
@@ -96,17 +96,17 @@ export default function FindStudentsPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Filters Sidebar */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 order-2 lg:order-1">
             <FilterSidebar type="jobs" />
           </div>
 
           {/* Jobs Grid */}
-          <div className="lg:col-span-3">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">
+          <div className="lg:col-span-3 order-1 lg:order-2">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
                 {mockJobs.length} Jobs Available
               </h2>
-              <select className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+              <select className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm sm:text-base w-full sm:w-auto">
                 <option>Sort by: Newest First</option>
                 <option>Sort by: Highest Budget</option>
                 <option>Sort by: Most Applications</option>
@@ -121,17 +121,17 @@ export default function FindStudentsPage() {
             </div>
 
             {/* Pagination */}
-            <div className="flex items-center justify-center gap-2 mt-8">
-              <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+            <div className="flex items-center justify-center gap-2 mt-8 flex-wrap">
+              <button className="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm sm:text-base">
                 Previous
               </button>
-              <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg">
+              <button className="px-3 sm:px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm sm:text-base">
                 1
               </button>
-              <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+              <button className="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm sm:text-base">
                 2
               </button>
-              <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+              <button className="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm sm:text-base">
                 Next
               </button>
             </div>

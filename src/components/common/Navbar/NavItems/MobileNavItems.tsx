@@ -31,7 +31,7 @@ function MobileNavItems({ onLinkClick }: MobileNavItemsProps) {
   return (
     <nav aria-label="Mobile navigation" className="w-full">
       <AccordionPrimitive.Root type="single" collapsible className="w-full">
-        <ul className="flex flex-col">
+        <ul className="flex flex-col gap-1">
           {menuItems.map((item) => {
             const parentActive = isParentActive(item);
             
@@ -40,11 +40,11 @@ function MobileNavItems({ onLinkClick }: MobileNavItemsProps) {
                 {item.hasDropdown ? (
                   <AccordionPrimitive.Item
                     value={item.title}
-                    className="group border-b last:border-b-0"
+                    className="group border-b border-gray-200 last:border-b-0"
                   >
                   <AccordionPrimitive.Header className="flex">
                     <AccordionPrimitive.Trigger
-                      className={`flex w-full items-center justify-between rounded-lg px-3 py-3 text-base font-medium tracking-[0.02em] outline-none transition-all hover:text-primary focus-visible:ring-[3px] focus-visible:ring-ring/50 data-[state=open]:bg-secondary data-[state=open]:border data-[state=open]:border-border data-[state=open]:shadow-sm`}
+                      className={`flex w-full items-center justify-between rounded-lg px-4 py-3.5 text-base font-semibold tracking-[0.02em] outline-none transition-all hover:text-primary hover:bg-gray-50 active:bg-gray-100 focus-visible:ring-2 focus-visible:ring-primary/50 data-[state=open]:bg-gray-50 data-[state=open]:text-primary`}
                     >
                       <Paragraph className={`text-left ${
                         parentActive
@@ -52,7 +52,7 @@ function MobileNavItems({ onLinkClick }: MobileNavItemsProps) {
                           : "!text-[#414141] group-data-[state=open]:!text-primary"
                       }`}>{item.title}</Paragraph>
                       <ChevronDown
-                        className={`ml-2 h-6 w-6 shrink-0 transition-transform group-data-[state=open]:rotate-180 ${
+                        className={`ml-2 h-5 w-5 shrink-0 transition-transform duration-200 group-data-[state=open]:rotate-180 ${
                           parentActive
                             ? "!text-primary"
                             : "!text-[#414141] group-data-[state=open]:!text-primary"
@@ -62,8 +62,8 @@ function MobileNavItems({ onLinkClick }: MobileNavItemsProps) {
                     </AccordionPrimitive.Trigger>
                   </AccordionPrimitive.Header>
                   <AccordionPrimitive.Content className="data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down overflow-hidden">
-                    <div className="mx-1 rounded-lg border border-border bg-card shadow-sm">
-                      <ul className="pl-4 pr-1 pb-2 pt-2 space-y-1">
+                    <div className="px-4 pb-3 pt-1">
+                      <ul className="space-y-1">
                         {item.items?.map((subItem) => (
                           <li key={subItem.title} className="list-none">
                             <Link
@@ -72,16 +72,16 @@ function MobileNavItems({ onLinkClick }: MobileNavItemsProps) {
                               aria-current={
                                 isActive(subItem.href) ? "page" : undefined
                               }
-                              className={`block rounded-md px-2 py-2 text-sm tracking-[0.02em] transition-colors outline-none border focus-visible:ring-[3px] focus-visible:ring-ring/50 ${
+                              className={`block rounded-lg px-4 py-2.5 text-sm font-medium tracking-[0.02em] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${
                                 isActive(subItem.href)
-                                  ? "!bg-secondary font-medium border-border"
-                                  : "hover:!bg-secondary/60 !border-transparent"
+                                  ? "!bg-indigo-50 !text-primary font-semibold"
+                                  : "!text-[#414141] hover:!bg-gray-50 hover:!text-primary"
                               }`}
                             >
                               <Paragraph className={`text-left ${
                                 isActive(subItem.href)
                                   ? "!text-primary"
-                                  : "!text-[#414141] hover:!text-primary"
+                                  : "!text-[#414141]"
                               }`}>
                                 {subItem.title}
                               </Paragraph>
@@ -97,12 +97,14 @@ function MobileNavItems({ onLinkClick }: MobileNavItemsProps) {
                   href={item.href}
                   onClick={onLinkClick}
                   aria-current={isActive(item.href) ? "page" : undefined}
-                  className={`block w-full rounded-md px-3 py-3 text-base font-medium tracking-[0.02em] transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50`}
+                  className={`block w-full rounded-lg px-4 py-3.5 text-base font-semibold tracking-[0.02em] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary/50 hover:bg-gray-50 active:bg-gray-100 ${
+                    isActive(item.href) ? "!text-primary" : "!text-[#414141] hover:!text-primary"
+                  }`}
                 >
                   <Paragraph className={`text-left ${
                     isActive(item.href)
                       ? "!text-primary"
-                      : "!text-[#414141] hover:!text-primary"
+                      : "!text-[#414141]"
                   }`}>{item.title}</Paragraph>
                 </Link>
               )}

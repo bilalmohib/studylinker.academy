@@ -21,11 +21,11 @@ export default function ForParentsPage() {
       cta={{ text: "Find a Teacher", href: "/parents/find-teachers" }}
     >
       <div className="space-y-12">
-        <section className="bg-white rounded-2xl p-8 shadow-lg">
-          <h2 className="text-3xl font-bold text-gray-900 mb-6">
+        <section className="bg-white rounded-2xl p-4 sm:p-8 shadow-lg">
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">
             Why Choose StudyLinker?
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             <div className="flex items-start gap-4">
               <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center">
                 <BsShieldCheck className="w-6 h-6 text-white" />
@@ -85,11 +85,11 @@ export default function ForParentsPage() {
           </div>
         </section>
 
-        <section className="bg-white rounded-2xl p-8 shadow-lg">
-          <h2 className="text-3xl font-bold text-gray-900 mb-6">
+        <section className="bg-white rounded-2xl p-4 sm:p-8 shadow-lg">
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">
             How It Works
           </h2>
-          <ol className="space-y-6">
+          <ol className="space-y-4 sm:space-y-6">
             <li className="flex gap-4">
               <div className="flex-shrink-0 w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold">
                 1

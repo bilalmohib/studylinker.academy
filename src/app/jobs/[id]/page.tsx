@@ -54,25 +54,25 @@ export default function JobDetailsPage({
       <Container>
         <div className="max-w-4xl mx-auto">
           {/* Header */}
-          <div className="bg-white rounded-2xl p-8 shadow-lg mb-6">
+          <div className="bg-white rounded-2xl p-4 sm:p-8 shadow-lg mb-6">
             <div className="flex items-start justify-between mb-6">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-4">
-                  <h1 className="text-3xl font-bold text-gray-900">{job.title}</h1>
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-4">
+                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 break-words">{job.title}</h1>
                   {job.status === "open" ? (
-                    <span className="px-3 py-1 text-sm font-semibold rounded-full bg-green-100 text-green-700">
+                    <span className="px-2 sm:px-3 py-1 text-xs sm:text-sm font-semibold rounded-full bg-green-100 text-green-700 shrink-0">
                       Open
                     </span>
                   ) : (
-                    <span className="px-3 py-1 text-sm font-semibold rounded-full bg-gray-100 text-gray-700">
+                    <span className="px-2 sm:px-3 py-1 text-xs sm:text-sm font-semibold rounded-full bg-gray-100 text-gray-700 shrink-0">
                       Closed
                     </span>
                   )}
                 </div>
-                <div className="flex flex-wrap items-center gap-4 text-gray-600">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-sm sm:text-base text-gray-600">
                   <span className="flex items-center gap-2">
-                    <BsBook className="w-5 h-5 text-indigo-600" />
-                    {job.subject}
+                    <BsBook className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600 shrink-0" />
+                    <span>{job.subject}</span>
                   </span>
                   <span>{job.level}</span>
                   {job.studentAge && <span>Age: {job.studentAge}</span>}
@@ -80,7 +80,7 @@ export default function JobDetailsPage({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-6 border-t border-gray-200">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 pt-6 border-t border-gray-200">
               <div className="flex items-center gap-2">
                 <BsClock className="w-5 h-5 text-indigo-600" />
                 <div>
@@ -113,8 +113,8 @@ export default function JobDetailsPage({
           </div>
 
           {/* Job Description */}
-          <div className="bg-white rounded-2xl p-8 shadow-lg mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+          <div className="bg-white rounded-2xl p-4 sm:p-8 shadow-lg mb-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4">
               Job Description
             </h2>
             <p className="text-gray-700 leading-relaxed mb-6">{job.description}</p>
@@ -150,40 +150,40 @@ export default function JobDetailsPage({
           </div>
 
           {/* Parent Info */}
-          <div className="bg-white rounded-2xl p-8 shadow-lg mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">About the Parent</h2>
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center text-white text-2xl font-bold">
+          <div className="bg-white rounded-2xl p-4 sm:p-8 shadow-lg mb-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4">About the Parent</h2>
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center text-white text-xl sm:text-2xl font-bold shrink-0">
                 {job.parentName.charAt(0)}
               </div>
-              <div>
-                <div className="font-semibold text-gray-900">{job.parentName}</div>
-                <div className="text-gray-600">{job.parentLocation}</div>
+              <div className="min-w-0">
+                <div className="font-semibold text-gray-900 truncate">{job.parentName}</div>
+                <div className="text-sm sm:text-base text-gray-600 truncate">{job.parentLocation}</div>
               </div>
             </div>
           </div>
 
           {/* Apply Section */}
           {job.status === "open" && (
-            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-8 text-white shadow-lg">
-              <h2 className="text-2xl font-bold mb-4">Ready to Apply?</h2>
-              <p className="text-white/90 mb-6">
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 sm:p-8 text-white shadow-lg">
+              <h2 className="text-xl sm:text-2xl font-bold mb-4">Ready to Apply?</h2>
+              <p className="text-sm sm:text-base text-white/90 mb-6">
                 Submit your application with your proposed rate and availability. The
                 parent will review your profile and get in touch.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                 <Button
                   asChild
-                  className="bg-white text-indigo-600 hover:bg-gray-100 font-semibold px-8 py-6 text-lg rounded-full"
+                  className="bg-white text-indigo-600 hover:bg-gray-100 font-semibold px-6 sm:px-8 py-5 sm:py-6 text-base sm:text-lg rounded-full w-full sm:w-auto"
                 >
-                  <Link href={`/jobs/${id}/apply`}>Apply Now</Link>
+                  <Link href={`/jobs/${id}/apply`} className="text-center">Apply Now</Link>
                 </Button>
                 <Button
                   asChild
-                  className="border-2 border-white bg-transparent text-white hover:bg-white/10 font-semibold px-8 py-6 text-lg rounded-full"
+                  className="border-2 border-white bg-transparent text-white hover:bg-white/10 font-semibold px-6 sm:px-8 py-5 sm:py-6 text-base sm:text-lg rounded-full w-full sm:w-auto"
                 >
                   <Link href={`/jobs/${id}/contact`} className="flex items-center justify-center">
-                    <BsChatDots className="w-5 h-5 mr-2" />
+                    <BsChatDots className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                     Message Parent
                   </Link>
                 </Button>

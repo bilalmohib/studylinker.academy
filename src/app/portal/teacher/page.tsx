@@ -50,56 +50,56 @@ export default function TeacherDashboardPage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-indigo-50 py-12">
       <Container>
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">
             Teacher Dashboard
           </h1>
-          <p className="text-xl text-gray-600">
+          <p className="text-lg sm:text-xl text-gray-600">
             Manage your teaching schedule and students
           </p>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-2xl p-6 shadow-lg">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
+          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-lg">
             <div className="flex items-center gap-3 mb-2">
-              <BsPeople className="w-8 h-8 text-indigo-600" />
-              <div>
-                <div className="text-3xl font-bold text-gray-900">12</div>
-                <div className="text-sm text-gray-600">Active Students</div>
+              <BsPeople className="w-6 h-6 sm:w-8 sm:h-8 text-indigo-600 shrink-0" />
+              <div className="min-w-0">
+                <div className="text-2xl sm:text-3xl font-bold text-gray-900">12</div>
+                <div className="text-xs sm:text-sm text-gray-600">Active Students</div>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-2xl p-6 shadow-lg">
+          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-lg">
             <div className="flex items-center gap-3 mb-2">
-              <BsBriefcase className="w-8 h-8 text-indigo-600" />
-              <div>
-                <div className="text-3xl font-bold text-gray-900">5</div>
-                <div className="text-sm text-gray-600">Applications</div>
+              <BsBriefcase className="w-6 h-6 sm:w-8 sm:h-8 text-indigo-600 shrink-0" />
+              <div className="min-w-0">
+                <div className="text-2xl sm:text-3xl font-bold text-gray-900">5</div>
+                <div className="text-xs sm:text-sm text-gray-600">Applications</div>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-2xl p-6 shadow-lg">
+          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-lg">
             <div className="flex items-center gap-3 mb-2">
-              <BsCurrencyDollar className="w-8 h-8 text-indigo-600" />
-              <div>
-                <div className="text-3xl font-bold text-gray-900">$1,800</div>
-                <div className="text-sm text-gray-600">This Month</div>
+              <BsCurrencyDollar className="w-6 h-6 sm:w-8 sm:h-8 text-indigo-600 shrink-0" />
+              <div className="min-w-0">
+                <div className="text-2xl sm:text-3xl font-bold text-gray-900">$1,800</div>
+                <div className="text-xs sm:text-sm text-gray-600">This Month</div>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-2xl p-6 shadow-lg">
+          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-lg">
             <div className="flex items-center gap-3 mb-2">
-              <BsBarChart className="w-8 h-8 text-indigo-600" />
-              <div>
-                <div className="text-3xl font-bold text-gray-900">4.9</div>
-                <div className="text-sm text-gray-600">Avg Rating</div>
+              <BsBarChart className="w-6 h-6 sm:w-8 sm:h-8 text-indigo-600 shrink-0" />
+              <div className="min-w-0">
+                <div className="text-2xl sm:text-3xl font-bold text-gray-900">4.9</div>
+                <div className="text-xs sm:text-sm text-gray-600">Avg Rating</div>
               </div>
             </div>
           </div>
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
           <Button
             asChild
             className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white p-6 rounded-2xl shadow-lg h-auto flex-col gap-2"
@@ -133,14 +133,14 @@ export default function TeacherDashboardPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* My Students */}
-          <div className="bg-white rounded-2xl p-8 shadow-lg">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">My Students</h2>
+          <div className="bg-white rounded-2xl p-4 sm:p-8 shadow-lg">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">My Students</h2>
               <Button
                 asChild
                 variant="outline"
                 size="sm"
-                className="border-indigo-600 text-indigo-600"
+                className="border-indigo-600 text-indigo-600 w-full sm:w-auto"
               >
                 <Link href="/teachers/find-students">Find More</Link>
               </Button>
@@ -184,14 +184,14 @@ export default function TeacherDashboardPage() {
           </div>
 
           {/* Applications */}
-          <div className="bg-white rounded-2xl p-8 shadow-lg">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">Applications</h2>
+          <div className="bg-white rounded-2xl p-4 sm:p-8 shadow-lg">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Applications</h2>
               <Button
                 asChild
                 variant="outline"
                 size="sm"
-                className="border-indigo-600 text-indigo-600"
+                className="border-indigo-600 text-indigo-600 w-full sm:w-auto"
               >
                 <Link href="/teachers/find-students">Browse Jobs</Link>
               </Button>
@@ -231,8 +231,8 @@ export default function TeacherDashboardPage() {
           </div>
 
           {/* Upcoming Classes */}
-          <div className="bg-white rounded-2xl p-8 shadow-lg">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">
+          <div className="bg-white rounded-2xl p-4 sm:p-8 shadow-lg">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6">
               Upcoming Classes
             </h2>
             <div className="space-y-4">
@@ -254,8 +254,8 @@ export default function TeacherDashboardPage() {
           </div>
 
           {/* Recent Activity */}
-          <div className="bg-white rounded-2xl p-8 shadow-lg">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">
+          <div className="bg-white rounded-2xl p-4 sm:p-8 shadow-lg">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6">
               Recent Activity
             </h2>
             <div className="space-y-4">

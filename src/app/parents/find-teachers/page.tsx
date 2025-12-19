@@ -71,20 +71,20 @@ export default function FindTeachersPage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-indigo-50 py-12">
       <Container>
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div>
-              <h1 className="text-4xl font-bold text-gray-900 mb-2">
+              <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">
                 Find Qualified Teachers
               </h1>
-              <p className="text-xl text-gray-600">
+              <p className="text-lg sm:text-xl text-gray-600">
                 Browse our marketplace of vetted, qualified teachers
               </p>
             </div>
             <Button
               asChild
-              className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 py-6 text-lg rounded-full shadow-xl"
+              className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 py-6 text-base sm:text-lg rounded-full shadow-xl w-full sm:w-auto"
             >
-              <Link href="/parents/post-job">
+              <Link href="/parents/post-job" className="flex items-center justify-center">
                 <BsPlusCircle className="w-5 h-5 mr-2" />
                 Post a Job
               </Link>
@@ -110,17 +110,17 @@ export default function FindTeachersPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Filters Sidebar */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 order-2 lg:order-1">
             <FilterSidebar type="teachers" />
           </div>
 
           {/* Teachers Grid */}
-          <div className="lg:col-span-3">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">
+          <div className="lg:col-span-3 order-1 lg:order-2">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
                 {mockTeachers.length} Teachers Found
               </h2>
-              <select className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+              <select className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm sm:text-base w-full sm:w-auto">
                 <option>Sort by: Highest Rated</option>
                 <option>Sort by: Most Reviews</option>
                 <option>Sort by: Lowest Price</option>
@@ -135,20 +135,20 @@ export default function FindTeachersPage() {
             </div>
 
             {/* Pagination */}
-            <div className="flex items-center justify-center gap-2 mt-8">
-              <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+            <div className="flex items-center justify-center gap-2 mt-8 flex-wrap">
+              <button className="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm sm:text-base">
                 Previous
               </button>
-              <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg">
+              <button className="px-3 sm:px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm sm:text-base">
                 1
               </button>
-              <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+              <button className="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm sm:text-base">
                 2
               </button>
-              <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+              <button className="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm sm:text-base">
                 3
               </button>
-              <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+              <button className="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm sm:text-base">
                 Next
               </button>
             </div>

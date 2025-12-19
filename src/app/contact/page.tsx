@@ -34,8 +34,8 @@ export default function ContactPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-8 shadow-lg">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">
+        <div className="bg-white rounded-2xl p-4 sm:p-8 shadow-lg">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">
             Send Us a Message
           </h2>
           <form className="space-y-4">

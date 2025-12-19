@@ -40,18 +40,18 @@ export default function PostJobPage() {
       <Container>
         <div className="max-w-4xl mx-auto">
           <div className="mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">
+            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">
               Post a Tuition Job
             </h1>
-            <p className="text-xl text-gray-600">
+            <p className="text-lg sm:text-xl text-gray-600">
               Create a job posting to find qualified teachers for your child
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Basic Information */}
-            <div className="bg-white rounded-2xl p-8 shadow-lg">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">
+            <div className="bg-white rounded-2xl p-4 sm:p-8 shadow-lg">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">
                 Basic Information
               </h2>
 
@@ -136,8 +136,8 @@ export default function PostJobPage() {
             </div>
 
             {/* Schedule & Budget */}
-            <div className="bg-white rounded-2xl p-8 shadow-lg">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">
+            <div className="bg-white rounded-2xl p-4 sm:p-8 shadow-lg">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">
                 Schedule & Budget
               </h2>
 
@@ -178,8 +178,8 @@ export default function PostJobPage() {
             </div>
 
             {/* Additional Details */}
-            <div className="bg-white rounded-2xl p-8 shadow-lg">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">
+            <div className="bg-white rounded-2xl p-4 sm:p-8 shadow-lg">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">
                 Additional Details
               </h2>
 
@@ -220,8 +220,8 @@ export default function PostJobPage() {
             </div>
 
             {/* Application Mode */}
-            <div className="bg-white rounded-2xl p-8 shadow-lg">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">
+            <div className="bg-white rounded-2xl p-4 sm:p-8 shadow-lg">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">
                 Application Mode
               </h2>
 
@@ -269,17 +269,17 @@ export default function PostJobPage() {
             </div>
 
             {/* Submit Button */}
-            <div className="flex gap-4">
+            <div className="flex flex-col sm:flex-row gap-4">
               <Button
                 type="submit"
-                className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-8 py-6 text-lg rounded-full shadow-xl"
+                className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 sm:px-8 py-5 sm:py-6 text-base sm:text-lg rounded-full shadow-xl"
               >
                 Post Job
               </Button>
               <Button
                 type="button"
                 variant="outline"
-                className="px-8 py-6 text-lg rounded-full"
+                className="px-6 sm:px-8 py-5 sm:py-6 text-base sm:text-lg rounded-full w-full sm:w-auto"
               >
                 Save as Draft
               </Button>

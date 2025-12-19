@@ -23,10 +23,10 @@ const Logo = ({ onClick }: LogoProps = {}) => {
         alt="StudyLinker Logo"
         width={32}
         height={32}
-        className="w-8 h-8"
+        className="w-7 h-7 sm:w-8 sm:h-8"
         priority
       />
-      <span className="font-fredoka text-2xl font-bold leading-none tracking-[0.09em] text-gray-900">
+      <span className="font-fredoka text-xl sm:text-2xl font-bold leading-none tracking-[0.09em] text-gray-900">
         Study<span className="text-indigo-600">Linker</span>
       </span>
     </div>

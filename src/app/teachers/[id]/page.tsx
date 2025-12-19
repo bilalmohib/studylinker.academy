@@ -58,19 +58,19 @@ export default function TeacherProfilePage({
       <Container>
         <div className="max-w-6xl mx-auto">
           {/* Header */}
-          <div className="bg-white rounded-2xl p-8 shadow-lg mb-6">
-            <div className="flex flex-col md:flex-row gap-6">
-              <div className="flex-shrink-0 relative">
+          <div className="bg-white rounded-2xl p-4 sm:p-8 shadow-lg mb-6">
+            <div className="flex flex-col md:flex-row gap-4 sm:gap-6">
+              <div className="shrink-0 relative mx-auto md:mx-0">
                 {teacher.avatar ? (
                   <Image
                     src={teacher.avatar}
                     alt={teacher.name}
                     width={128}
                     height={128}
-                    className="w-32 h-32 rounded-full object-cover shadow-lg"
+                    className="w-24 h-24 sm:w-32 sm:h-32 rounded-full object-cover shadow-lg"
                   />
                 ) : (
-                  <div className="w-32 h-32 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center text-white text-4xl font-bold shadow-lg">
+                  <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center text-white text-3xl sm:text-4xl font-bold shadow-lg">
                     {teacher.name.charAt(0)}
                   </div>
                 )}
@@ -80,15 +80,15 @@ export default function TeacherProfilePage({
                   </div>
                 )}
               </div>
-              <div className="flex-1">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <div className="flex items-center gap-3 mb-2 flex-wrap">
-                      <h1 className="text-3xl font-bold text-gray-900">
+              <div className="flex-1 text-center md:text-left">
+                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
+                  <div className="flex-1">
+                    <div className="flex items-center justify-center md:justify-start gap-2 sm:gap-3 mb-2 flex-wrap">
+                      <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
                         {teacher.name}
                       </h1>
                       {teacher.verified && (
-                        <BsCheckCircle className="w-6 h-6 text-indigo-600" />
+                        <BsCheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-600 shrink-0" />
                       )}
                     </div>
                     <div className="flex items-center gap-2 text-gray-600 mb-3">
