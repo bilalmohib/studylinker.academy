@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Container from "@/components/common/Container";
 import { Button } from "@/components/ui/button";
-import { BsBook, BsCalendar, BsCurrencyDollar, BsInfoCircle } from "react-icons/bs";
+import { BsBook, BsCalendar, BsCurrencyDollar, BsInfoCircle, BsStars } from "react-icons/bs";
 
 export default function PostJobPage() {
   const [formData, setFormData] = useState({
@@ -17,6 +17,7 @@ export default function PostJobPage() {
     curriculum: false,
     applicationMode: "open", // "open" or "curated"
   });
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,6 +34,45 @@ export default function PostJobPage() {
       [name]:
         type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
     }));
+  };
+
+  const handleGenerateDescription = async () => {
+    if (!formData.subject || !formData.level) {
+      alert("Please fill in at least Subject and Education Level before generating a description.");
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const response = await fetch("/api/generate-job-description", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          subject: formData.subject,
+          level: formData.level,
+          studentAge: formData.studentAge,
+          hoursPerWeek: formData.hoursPerWeek,
+          budget: formData.budget,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to generate description");
+      }
+
+      const data = await response.json();
+      setFormData((prev) => ({
+        ...prev,
+        description: data.description,
+      }));
+    } catch (error) {
+      console.error("Error generating description:", error);
+      alert("Failed to generate job description. Please try again.");
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
@@ -185,18 +225,34 @@ export default function PostJobPage() {
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Job Description *
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-semibold text-gray-700">
+                      Job Description *
+                    </label>
+                    <Button
+                      type="button"
+                      onClick={handleGenerateDescription}
+                      disabled={isGenerating || !formData.subject || !formData.level}
+                      className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-4 py-2 text-sm rounded-lg shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      <BsStars className="w-4 h-4" />
+                      {isGenerating ? "Generating..." : "Generate with AI"}
+                    </Button>
+                  </div>
                   <textarea
                     name="description"
                     value={formData.description}
                     onChange={handleChange}
                     rows={6}
-                    placeholder="Describe what you're looking for in a teacher, specific requirements, learning goals, etc."
+                    placeholder="Describe what you're looking for in a teacher, specific requirements, learning goals, etc. Or click 'Generate with AI' to create one automatically."
                     required
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   />
+                  {!formData.subject || !formData.level ? (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Fill in Subject and Education Level to enable AI generation
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="flex items-start gap-3">

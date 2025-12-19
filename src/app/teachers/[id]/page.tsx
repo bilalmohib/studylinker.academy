@@ -27,7 +27,6 @@ const getTeacherData = (id: string) => {
     reviews: 127,
     students: 45,
     rate: "$150/month",
-    badge: "Top Rated",
     subjects: ["Mathematics", "Physics", "Chemistry"],
     levels: ["O-Level", "A-Level"],
     bio: "Experienced mathematics and science tutor with over 10 years of teaching experience. Specialized in O-Level and A-Level curriculum. Passionate about helping students achieve their academic goals.",
