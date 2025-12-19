@@ -1,6 +1,6 @@
 "use client";
 
-import { use } from "react";
+import { use, useEffect, useState } from "react";
 import Container from "@/components/common/Container";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -16,33 +16,31 @@ import {
 } from "react-icons/bs";
 import Image from "next/image";
 import Badge, { BADGE_TYPES } from "@/components/marketplace/Badge";
+import { getTeacherProfile } from "@/actions/teachers/actions";
+import { getTeacherSubjects, getTeacherLevels } from "@/actions/teachers/subjects";
+import { getReviewsByTeacher } from "@/actions/reviews/actions";
+import { getQualificationsByTeacher } from "@/actions/teachers/qualifications";
+import toast from "react-hot-toast";
 
-// Mock data - replace with API call
-const getTeacherData = (id: string) => {
-  return {
-    id,
-    name: "Sarah Johnson",
-    location: "United Kingdom",
-    rating: 4.9,
-    reviews: 127,
-    students: 45,
-    rate: "$150/month",
-    subjects: ["Mathematics", "Physics", "Chemistry"],
-    levels: ["O-Level", "A-Level"],
-    bio: "Experienced mathematics and science tutor with over 10 years of teaching experience. Specialized in O-Level and A-Level curriculum. Passionate about helping students achieve their academic goals.",
-    qualifications: [
-      "MSc in Mathematics, University of Cambridge",
-      "BSc in Physics, University of Oxford",
-      "Teaching Certificate (PGCE)",
-    ],
-    experience: "10+ years",
-    availability: "Monday - Friday: 2 PM - 8 PM GMT",
-    languages: ["English"],
-    verified: true,
-    badge: BADGE_TYPES.TOP_RATED,
-    avatar: "https://i.pravatar.cc/300?img=47",
-  };
-};
+interface TeacherData {
+  id: string;
+  name: string;
+  location: string;
+  rating: number;
+  reviews: number;
+  students: number;
+  rate: string;
+  subjects: string[];
+  levels: string[];
+  bio: string;
+  qualifications: string[];
+  experience: string;
+  availability: string;
+  languages: string[];
+  verified: boolean;
+  badge?: string;
+  avatar?: string;
+}
 
 export default function TeacherProfilePage({
   params,
@@ -50,7 +48,110 @@ export default function TeacherProfilePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const teacher = getTeacherData(id);
+  const [teacher, setTeacher] = useState<TeacherData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchTeacher = async () => {
+      setLoading(true);
+      try {
+        const [profileResult, subjectsResult, levelsResult, reviewsResult, qualificationsResult] = await Promise.all([
+          getTeacherProfile(id),
+          getTeacherSubjects(id),
+          getTeacherLevels(id),
+          getReviewsByTeacher(id),
+          getQualificationsByTeacher(id),
+        ]);
+
+        if (profileResult.success && profileResult.data) {
+          const profile = profileResult.data;
+          const userProfile = profile.UserProfile || {};
+          const name = `${userProfile.firstName || ""} ${userProfile.lastName || ""}`.trim() || "Teacher";
+
+          const subjects = subjectsResult.success
+            ? subjectsResult.data.map((s: any) => s.subject)
+            : [];
+          const levels = levelsResult.success
+            ? levelsResult.data.map((l: any) => l.level)
+            : [];
+
+          // Get qualifications
+          const qualifications = qualificationsResult.success && qualificationsResult.data
+            ? qualificationsResult.data.map((q: any) => {
+                let qualStr = q.title;
+                if (q.institution) qualStr += ` from ${q.institution}`;
+                if (q.year) qualStr += ` (${q.year})`;
+                return qualStr;
+              })
+            : [];
+
+          // Map badge
+          let badge;
+          if (profile.badge === "TOP_RATED") badge = BADGE_TYPES.TOP_RATED;
+          else if (profile.badge === "RISING_TALENT") badge = BADGE_TYPES.RISING_TALENT;
+          else if (profile.badge === "VERIFIED") badge = BADGE_TYPES.VERIFIED;
+          else if (profile.badge === "PREMIUM") badge = BADGE_TYPES.PREMIUM;
+
+          setTeacher({
+            id: profile.id,
+            name,
+            location: profile.location || "Not specified",
+            rating: profile.rating || 0,
+            reviews: reviewsResult.success ? reviewsResult.data.length : profile.totalReviews || 0,
+            students: profile.totalStudents || 0,
+            rate: profile.hourlyRate ? `$${profile.hourlyRate}/month` : "Contact for rate",
+            subjects,
+            levels,
+            bio: profile.bio || "No bio available.",
+            qualifications,
+            experience: profile.experience || qualifications.length > 0 
+              ? `${qualifications.length} qualification${qualifications.length !== 1 ? "s" : ""}`
+              : "Not specified",
+            availability: profile.availability
+              ? JSON.stringify(profile.availability)
+              : "Not specified",
+            languages: profile.languages || [],
+            verified: profile.verified || false,
+            badge,
+            avatar: userProfile.avatar || undefined,
+          });
+        } else {
+          toast.error(profileResult.error || "Failed to load teacher profile");
+        }
+      } catch (error) {
+        console.error("Error fetching teacher:", error);
+        toast.error("An error occurred while loading teacher profile");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTeacher();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-indigo-50 py-12">
+        <Container>
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+          </div>
+        </Container>
+      </div>
+    );
+  }
+
+  if (!teacher) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-indigo-50 py-12">
+        <Container>
+          <div className="text-center py-12">
+            <p className="text-gray-600 text-lg">Teacher not found.</p>
+          </div>
+        </Container>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-indigo-50 py-12">

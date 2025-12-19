@@ -1,11 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@clerk/nextjs";
 import Container from "@/components/common/Container";
 import { Button } from "@/components/ui/button";
 import { BsBook, BsCalendar, BsCurrencyDollar, BsInfoCircle, BsStars } from "react-icons/bs";
+import toast from "react-hot-toast";
+import { createJobPosting } from "@/actions/jobs/actions";
+import { getCurrentParentProfile } from "@/actions/parents/actions";
+import { useRouter } from "next/navigation";
 
 export default function PostJobPage() {
+  const { userId, isLoaded } = useAuth();
+  const router = useRouter();
   const [formData, setFormData] = useState({
     title: "",
     subject: "",
@@ -18,11 +25,68 @@ export default function PostJobPage() {
     applicationMode: "open", // "open" or "curated"
   });
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [parentId, setParentId] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (isLoaded && !userId) {
+      router.push("/sign-up?redirect_url=/parents/post-job");
+    }
+  }, [isLoaded, userId, router]);
+
+  // Get parent profile on mount
+  useEffect(() => {
+    if (!userId) return;
+
+    const fetchParentProfile = async () => {
+      const result = await getCurrentParentProfile();
+      if (result.success && "data" in result && result.data) {
+        setParentId(result.data.id);
+      } else {
+        toast.error("Please complete your parent profile first");
+        router.push("/portal/parent");
+      }
+    };
+    fetchParentProfile();
+  }, [userId, router]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle form submission
-    console.log("Job posted:", formData);
+    
+    if (!parentId) {
+      toast.error("Parent profile not found");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const result = await createJobPosting({
+        parentId,
+        title: formData.title,
+        subject: formData.subject,
+        level: formData.level,
+        studentAge: formData.studentAge ? parseInt(formData.studentAge) : null,
+        hoursPerWeek: formData.hoursPerWeek,
+        budget: formData.budget,
+        description: formData.description,
+        requirements: [], // TODO: Add requirements field
+        curriculum: formData.curriculum,
+        applicationMode: formData.applicationMode.toUpperCase() as "OPEN" | "CURATED",
+      });
+
+      if (result.success && "data" in result) {
+        toast.success("Job posted successfully!");
+        router.push(`/jobs/${result.data.id}`);
+      } else {
+        toast.error("error" in result ? result.error : "Failed to post job");
+      }
+    } catch (error) {
+      console.error("Error posting job:", error);
+      toast.error("An error occurred while posting the job");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleChange = (
@@ -328,12 +392,13 @@ export default function PostJobPage() {
 
             {/* Submit Button */}
             <div className="flex flex-col sm:flex-row gap-4">
-              <Button
-                type="submit"
-                className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 sm:px-8 py-5 sm:py-6 text-base sm:text-lg rounded-full shadow-xl"
-              >
-                Post Job
-              </Button>
+                  <Button
+                    type="submit"
+                    disabled={isSubmitting || !parentId}
+                    className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 sm:px-8 py-5 sm:py-6 text-base sm:text-lg rounded-full shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSubmitting ? "Posting..." : "Post Job"}
+                  </Button>
               <Button
                 type="button"
                 variant="outline"

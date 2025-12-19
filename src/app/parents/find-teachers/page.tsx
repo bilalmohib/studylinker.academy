@@ -1,71 +1,132 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 import Container from "@/components/common/Container";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { BsSearch, BsPlusCircle } from "react-icons/bs";
 import TeacherCard from "@/components/marketplace/TeacherCard";
 import FilterSidebar from "@/components/marketplace/FilterSidebar";
-import { BADGE_TYPES } from "@/components/marketplace/Badge";
+import { BADGE_TYPES, BadgeType } from "@/components/marketplace/Badge";
+import { searchTeachers } from "@/actions/teachers/actions";
+import { getTeacherSubjects, getTeacherLevels } from "@/actions/teachers/subjects";
+import toast from "react-hot-toast";
 
-// Mock data - replace with API calls later
-const mockTeachers = [
-  {
-    id: "1",
-    name: "Sarah Johnson",
-    subjects: ["Mathematics", "Physics", "Chemistry"],
-    level: "O-Level, A-Level",
-    rating: 4.9,
-    reviews: 127,
-    students: 45,
-    rate: "$150",
-    location: "United Kingdom",
-    badge: BADGE_TYPES.TOP_RATED,
-    avatar: "https://i.pravatar.cc/150?img=47",
-  },
-  {
-    id: "2",
-    name: "Ahmed Hassan",
-    subjects: ["Mathematics", "English", "Science"],
-    level: "Primary, Middle School",
-    rating: 4.8,
-    reviews: 89,
-    students: 32,
-    rate: "$120",
-    location: "Egypt",
-    badge: BADGE_TYPES.RISING_TALENT,
-    avatar: "https://i.pravatar.cc/150?img=12",
-  },
-  {
-    id: "3",
-    name: "Maria Rodriguez",
-    subjects: ["Spanish", "History", "Geography"],
-    level: "Secondary School, O-Level",
-    rating: 4.7,
-    reviews: 56,
-    students: 28,
-    rate: "$130",
-    location: "Spain",
-    avatar: "https://i.pravatar.cc/150?img=33",
-  },
-  {
-    id: "4",
-    name: "David Chen",
-    subjects: ["Mathematics", "Computer Science"],
-    level: "A-Level",
-    rating: 5.0,
-    reviews: 203,
-    students: 67,
-    rate: "$180",
-    location: "Singapore",
-    badge: BADGE_TYPES.TOP_RATED,
-    avatar: "https://i.pravatar.cc/150?img=68",
-  },
-];
+interface Teacher {
+  id: string;
+  name: string;
+  subjects: string[];
+  level: string;
+  rating: number;
+  reviews: number;
+  students: number;
+  rate: string;
+  location: string;
+  badge?: BadgeType;
+  avatar?: string;
+}
 
 export default function FindTeachersPage() {
+  const { userId, isLoaded } = useAuth();
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [filters, setFilters] = useState({
+    subject: "",
+    level: "",
+    minRating: undefined as number | undefined,
+    verified: undefined as boolean | undefined,
+    maxRate: undefined as number | undefined,
+  });
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (isLoaded && !userId) {
+      router.push("/sign-up?redirect_url=/parents/find-teachers");
+    }
+  }, [isLoaded, userId, router]);
+
+  // Fetch teachers
+  useEffect(() => {
+    if (!userId) return;
+
+    const fetchTeachers = async () => {
+      setLoading(true);
+      try {
+        const result = await searchTeachers({
+          ...filters,
+          page,
+          limit: 20,
+        });
+
+        if (result.success && result.data) {
+          // Transform database data to match TeacherCard props
+          const transformedTeachers = await Promise.all(
+            result.data.map(async (teacher: any) => {
+              // Get subjects and levels
+              const [subjectsResult, levelsResult] = await Promise.all([
+                getTeacherSubjects(teacher.id),
+                getTeacherLevels(teacher.id),
+              ]);
+
+              const subjects = subjectsResult.success && subjectsResult.data
+                ? subjectsResult.data.map((s: any) => s.subject)
+                : [];
+              const levels = levelsResult.success && levelsResult.data
+                ? levelsResult.data.map((l: any) => l.level).join(", ")
+                : "";
+
+              const userProfile = teacher.UserProfile || {};
+              const name = `${userProfile.firstName || ""} ${userProfile.lastName || ""}`.trim() || "Teacher";
+
+          // Map badge from database format to BadgeType
+          let badge: BadgeType | undefined;
+          if (teacher.badge === "TOP_RATED") badge = BADGE_TYPES.TOP_RATED;
+          else if (teacher.badge === "RISING_TALENT") badge = BADGE_TYPES.RISING_TALENT;
+          else if (teacher.badge === "VERIFIED") badge = BADGE_TYPES.VERIFIED;
+          else if (teacher.badge === "NEW") badge = BADGE_TYPES.NEW;
+
+              return {
+                id: teacher.id,
+                name,
+                subjects,
+                level: levels || "Not specified",
+                rating: teacher.rating || 0,
+                reviews: teacher.totalReviews || 0,
+                students: teacher.totalStudents || 0,
+                rate: teacher.hourlyRate
+                  ? `$${teacher.hourlyRate}`
+                  : "Contact for rate",
+                location: teacher.location || "Not specified",
+                badge,
+                avatar: userProfile.avatar || undefined,
+              };
+            })
+          );
+
+          setTeachers(transformedTeachers);
+          setTotalPages(result.pagination?.totalPages || 1);
+        } else {
+          toast.error("error" in result ? result.error : "Failed to load teachers");
+          setTeachers([]);
+        }
+      } catch (error) {
+        console.error("Error fetching teachers:", error);
+        toast.error("An error occurred while loading teachers");
+        setTeachers([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTeachers();
+  }, [userId, page, filters]);
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-indigo-50 py-12">
@@ -118,7 +179,7 @@ export default function FindTeachersPage() {
           <div className="lg:col-span-3 order-1 lg:order-2">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
               <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
-                {mockTeachers.length} Teachers Found
+                {loading ? "Loading..." : `${teachers.length} Teachers Found`}
               </h2>
               <select className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm sm:text-base w-full sm:w-auto">
                 <option>Sort by: Highest Rated</option>
@@ -128,30 +189,68 @@ export default function FindTeachersPage() {
               </select>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {mockTeachers.map((teacher) => (
-                <TeacherCard key={teacher.id} {...teacher} />
-              ))}
-            </div>
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+              </div>
+            ) : teachers.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-gray-600 text-lg">No teachers found. Try adjusting your filters.</p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {teachers.map((teacher) => (
+                    <TeacherCard key={teacher.id} {...teacher} />
+                  ))}
+                </div>
 
-            {/* Pagination */}
-            <div className="flex items-center justify-center gap-2 mt-8 flex-wrap">
-              <button className="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm sm:text-base">
-                Previous
-              </button>
-              <button className="px-3 sm:px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm sm:text-base">
-                1
-              </button>
-              <button className="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm sm:text-base">
-                2
-              </button>
-              <button className="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm sm:text-base">
-                3
-              </button>
-              <button className="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm sm:text-base">
-                Next
-              </button>
-            </div>
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-center gap-2 mt-8 flex-wrap">
+                    <button
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      className="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (page <= 3) {
+                        pageNum = i + 1;
+                      } else if (page >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = page - 2 + i;
+                      }
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setPage(pageNum)}
+                          className={`px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base ${
+                            page === pageNum
+                              ? "bg-indigo-600 text-white"
+                              : "border border-gray-300 hover:bg-gray-50"
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                    <button
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={page === totalPages}
+                      className="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       </Container>

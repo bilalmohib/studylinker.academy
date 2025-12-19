@@ -1,27 +1,91 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useState, useEffect } from "react";
+import { useAuth } from "@clerk/nextjs";
 import Container from "@/components/common/Container";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { BsCurrencyDollar, BsCalendar, BsFileText } from "react-icons/bs";
+import { createApplication } from "@/actions/applications/actions";
+import { getCurrentTeacherProfile } from "@/actions/teachers/actions";
+import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 
 export default function ApplyToJobPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = use(params);
+  const { id: jobId } = use(params);
+  const { userId, isLoaded } = useAuth();
+  const router = useRouter();
   const [formData, setFormData] = useState({
     proposedRate: "",
     availability: "",
     coverLetter: "",
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [teacherId, setTeacherId] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (isLoaded && !userId) {
+      router.push(`/sign-up?redirect_url=/jobs/${jobId}/apply`);
+    }
+  }, [isLoaded, userId, router, jobId]);
+
+  // Get teacher profile on mount
+  useEffect(() => {
+    if (!userId) return;
+
+    const fetchTeacherProfile = async () => {
+      const result = await getCurrentTeacherProfile();
+      if (result.success) {
+        const data = result as { success: true; data: { id: string } };
+        if (data.data) {
+          setTeacherId(data.data.id);
+        }
+      } else {
+        toast.error("Please complete your teacher profile first");
+        router.push("/portal/teacher");
+      }
+    };
+    fetchTeacherProfile();
+  }, [userId, router]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle application submission
-    console.log("Application submitted:", formData);
+    
+    if (!teacherId) {
+      toast.error("Teacher profile not found");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Extract numeric value from proposedRate (e.g., "$150/month" -> 150)
+      const rateMatch = formData.proposedRate.match(/\d+/);
+      const proposedRate = rateMatch ? parseFloat(rateMatch[0]) : null;
+
+      const result = await createApplication({
+        jobId,
+        teacherId,
+        proposedRate,
+        coverLetter: formData.coverLetter || formData.availability || null,
+      });
+
+      if (result.success) {
+        toast.success("Application submitted successfully!");
+        router.push(`/jobs/${jobId}`);
+      } else {
+        toast.error("error" in result ? result.error : "Failed to submit application");
+      }
+    } catch (error) {
+      console.error("Error submitting application:", error);
+      toast.error("An error occurred while submitting the application");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleChange = (
@@ -37,7 +101,7 @@ export default function ApplyToJobPage({
         <div className="max-w-3xl mx-auto">
           <div className="mb-8">
             <Link
-              href={`/jobs/${id}`}
+              href={`/jobs/${jobId}`}
               className="text-indigo-600 hover:text-indigo-700 mb-4 inline-block"
             >
               ← Back to Job Details
@@ -115,9 +179,10 @@ export default function ApplyToJobPage({
             <div className="flex gap-4">
               <Button
                 type="submit"
-                className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-8 py-6 text-lg rounded-full shadow-xl"
+                disabled={isSubmitting || !teacherId}
+                className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-8 py-6 text-lg rounded-full shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Submit Application
+                {isSubmitting ? "Submitting..." : "Submit Application"}
               </Button>
               <Button
                 type="button"
@@ -125,7 +190,7 @@ export default function ApplyToJobPage({
                 asChild
                 className="px-8 py-6 text-lg rounded-full"
               >
-                <Link href={`/jobs/${id}`}>Cancel</Link>
+                <Link href={`/jobs/${jobId}`}>Cancel</Link>
               </Button>
             </div>
           </form>

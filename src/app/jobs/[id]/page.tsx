@@ -1,6 +1,6 @@
 "use client";
 
-import { use } from "react";
+import { use, useEffect, useState } from "react";
 import Container from "@/components/common/Container";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -13,33 +13,27 @@ import {
   BsCheckCircle,
   BsChatDots,
 } from "react-icons/bs";
+import { getJobPosting } from "@/actions/jobs/actions";
+import { getApplicationsByJob } from "@/actions/applications/actions";
+import toast from "react-hot-toast";
 
-// Mock data - replace with API call
-const getJobData = (id: string) => {
-  return {
-    id,
-    title: "Mathematics Tutor Needed for O-Level Student",
-    subject: "Mathematics",
-    level: "O-Level",
-    studentAge: 16,
-    hoursPerWeek: "5-8",
-    budget: "$150-200",
-    postedDate: "2 days ago",
-    applications: 12,
-    status: "open",
-    curriculum: true,
-    description:
-      "Looking for an experienced mathematics tutor for my 16-year-old daughter who is preparing for O-Level exams. She needs help with algebra, geometry, and calculus. Prefer someone patient and able to explain concepts clearly.",
-    requirements: [
-      "Minimum 3 years of teaching experience",
-      "O-Level curriculum expertise",
-      "Available for evening sessions (GMT)",
-      "Good communication skills",
-    ],
-    parentName: "John Smith",
-    parentLocation: "United Kingdom",
-  };
-};
+interface JobData {
+  id: string;
+  title: string;
+  subject: string;
+  level: string;
+  studentAge: number | null;
+  hoursPerWeek: string;
+  budget: string;
+  postedDate: string;
+  applications: number;
+  status: string;
+  curriculum: boolean;
+  description: string;
+  requirements: string[];
+  parentName: string;
+  parentLocation: string;
+}
 
 export default function JobDetailsPage({
   params,
@@ -47,7 +41,92 @@ export default function JobDetailsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const job = getJobData(id);
+  const [job, setJob] = useState<JobData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchJob = async () => {
+      setLoading(true);
+      try {
+        const [jobResult, applicationsResult] = await Promise.all([
+          getJobPosting(id),
+          getApplicationsByJob(id),
+        ]);
+
+        if (jobResult.success && jobResult.data) {
+          const jobData = jobResult.data;
+          const parentProfile = jobData.ParentProfile;
+          const userProfile = parentProfile?.UserProfile || {};
+
+          // Calculate posted date
+          const postedDate = new Date(jobData.createdAt);
+          const now = new Date();
+          const diffTime = Math.abs(now.getTime() - postedDate.getTime());
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          let postedDateStr = "";
+          if (diffDays === 0) postedDateStr = "Today";
+          else if (diffDays === 1) postedDateStr = "1 day ago";
+          else if (diffDays < 7) postedDateStr = `${diffDays} days ago`;
+          else if (diffDays < 30) postedDateStr = `${Math.floor(diffDays / 7)} weeks ago`;
+          else postedDateStr = `${Math.floor(diffDays / 30)} months ago`;
+
+          const parentName = `${userProfile.firstName || ""} ${userProfile.lastName || ""}`.trim() || "Parent";
+          const parentLocation = userProfile.location || "Not specified";
+
+          setJob({
+            id: jobData.id,
+            title: jobData.title,
+            subject: jobData.subject,
+            level: jobData.level,
+            studentAge: jobData.studentAge,
+            hoursPerWeek: jobData.hoursPerWeek,
+            budget: jobData.budget,
+            postedDate: postedDateStr,
+            applications: applicationsResult.success ? applicationsResult.data.length : 0,
+            status: jobData.status.toLowerCase(),
+            curriculum: jobData.curriculum,
+            description: jobData.description,
+            requirements: jobData.requirements || [],
+            parentName,
+            parentLocation,
+          });
+        } else {
+          toast.error(jobResult.error || "Failed to load job posting");
+        }
+      } catch (error) {
+        console.error("Error fetching job:", error);
+        toast.error("An error occurred while loading job posting");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchJob();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-indigo-50 py-12">
+        <Container>
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+          </div>
+        </Container>
+      </div>
+    );
+  }
+
+  if (!job) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-indigo-50 py-12">
+        <Container>
+          <div className="text-center py-12">
+            <p className="text-gray-600 text-lg">Job posting not found.</p>
+          </div>
+        </Container>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-indigo-50 py-12">

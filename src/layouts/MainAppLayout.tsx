@@ -18,7 +18,7 @@ const MainAppLayout = ({ children }: MainAppLayoutProps) => {
       <div className="relative z-10 !overflow-x-hidden">{children}</div>
 
       <Footer />
-      
+
       <Toaster position="top-left" reverseOrder={false} />
     </div>
   );
