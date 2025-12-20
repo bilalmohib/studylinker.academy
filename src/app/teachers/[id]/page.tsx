@@ -68,10 +68,10 @@ export default function TeacherProfilePage({
           const userProfile = profile.UserProfile || {};
           const name = `${userProfile.firstName || ""} ${userProfile.lastName || ""}`.trim() || "Teacher";
 
-          const subjects = subjectsResult.success
+          const subjects = subjectsResult.success && subjectsResult.data
             ? subjectsResult.data.map((s: any) => s.subject)
             : [];
-          const levels = levelsResult.success
+          const levels = levelsResult.success && levelsResult.data
             ? levelsResult.data.map((l: any) => l.level)
             : [];
 
@@ -90,14 +90,14 @@ export default function TeacherProfilePage({
           if (profile.badge === "TOP_RATED") badge = BADGE_TYPES.TOP_RATED;
           else if (profile.badge === "RISING_TALENT") badge = BADGE_TYPES.RISING_TALENT;
           else if (profile.badge === "VERIFIED") badge = BADGE_TYPES.VERIFIED;
-          else if (profile.badge === "PREMIUM") badge = BADGE_TYPES.PREMIUM;
+          else if (profile.badge === "NEW") badge = BADGE_TYPES.NEW;
 
           setTeacher({
             id: profile.id,
             name,
             location: profile.location || "Not specified",
             rating: profile.rating || 0,
-            reviews: reviewsResult.success ? reviewsResult.data.length : profile.totalReviews || 0,
+            reviews: reviewsResult.success && reviewsResult.data ? reviewsResult.data.length : profile.totalReviews || 0,
             students: profile.totalStudents || 0,
             rate: profile.hourlyRate ? `$${profile.hourlyRate}/month` : "Contact for rate",
             subjects,
@@ -116,7 +116,8 @@ export default function TeacherProfilePage({
             avatar: userProfile.avatar || undefined,
           });
         } else {
-          toast.error(profileResult.error || "Failed to load teacher profile");
+          const errorMessage = "error" in profileResult ? profileResult.error : "Failed to load teacher profile";
+          toast.error(errorMessage);
         }
       } catch (error) {
         console.error("Error fetching teacher:", error);

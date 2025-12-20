@@ -108,9 +108,9 @@ export default function ParentDashboardPage() {
 
         // Process contracts (hired teachers)
         if (contractsResult.success && contractsResult.data) {
-          const activeContracts = contractsResult.data.filter(
+          const activeContracts = (contractsResult.data as any[]).filter(
             (c: any) => c.status === "ACTIVE"
-          );
+          ) as Array<{ id: string; teacherId: string; subject: string; TeacherProfile?: any; status: string }>;
 
           const teachersData = await Promise.all(
             activeContracts.map(async (contract: any) => {
@@ -123,10 +123,10 @@ export default function ParentDashboardPage() {
               let nextClass = "No upcoming classes";
               if (classesResult.success && classesResult.data && classesResult.data.length > 0) {
                 const upcoming = classesResult.data
-                  .filter((c: any) => new Date(c.scheduledAt) > new Date())
-                  .sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())[0];
+                  .filter((c: any) => c.scheduledAt && new Date(c.scheduledAt) > new Date())
+                  .sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())[0] as { scheduledAt: string } | undefined;
                 
-                if (upcoming) {
+                if (upcoming && upcoming.scheduledAt) {
                   const classDate = new Date(upcoming.scheduledAt);
                   const now = new Date();
                   const diffTime = classDate.getTime() - now.getTime();
@@ -162,10 +162,10 @@ export default function ParentDashboardPage() {
           for (const contract of activeContracts) {
             const classesResult = await getClassesByContract(contract.id);
             if (classesResult.success && classesResult.data) {
-              const upcoming = classesResult.data
-                .filter((c: any) => new Date(c.scheduledAt) > new Date())
+              const upcoming = (classesResult.data as any[])
+                .filter((c: any) => c.scheduledAt && new Date(c.scheduledAt) > new Date())
                 .sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
-                .slice(0, 5);
+                .slice(0, 5) as Array<{ id: string; title: string; scheduledAt: string }>;
 
               for (const classItem of upcoming) {
                 const teacherProfile = contract.TeacherProfile || {};

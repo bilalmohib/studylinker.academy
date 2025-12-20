@@ -17,7 +17,7 @@ interface Job {
   title: string;
   subject: string;
   level: string;
-  studentAge: number | null;
+  studentAge?: number;
   hoursPerWeek: string;
   budget: string;
   postedDate: string;
@@ -117,7 +117,7 @@ export default function FindStudentsPage() {
                 title: job.title,
                 subject: job.subject,
                 level: job.level,
-                studentAge: job.studentAge,
+                studentAge: job.studentAge ?? undefined,
                 hoursPerWeek: job.hoursPerWeek,
                 budget: job.budget,
                 postedDate: postedDateStr,
@@ -131,7 +131,8 @@ export default function FindStudentsPage() {
           setJobs(transformedJobs);
           setTotalPages(result.pagination?.totalPages || 1);
         } else {
-          toast.error(result.error || "Failed to load jobs");
+          const errorMessage = "error" in result ? result.error : "Failed to load jobs";
+          toast.error(errorMessage);
           setJobs([]);
         }
       } catch (error) {
@@ -208,7 +209,11 @@ export default function FindStudentsPage() {
               <>
                 <div className="space-y-4">
                   {jobs.map((job) => (
-                    <JobCard key={job.id} {...job} />
+                    <JobCard 
+                      key={job.id} 
+                      {...job} 
+                      status={job.status === "filled" || job.status === "cancelled" ? "closed" : job.status}
+                    />
                   ))}
                 </div>
 
