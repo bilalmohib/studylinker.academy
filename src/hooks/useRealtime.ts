@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { getSupabaseClient } from "@/lib/db/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
@@ -26,9 +26,24 @@ export function useRealtime<T = any>({
 }: UseRealtimeOptions) {
   const [channel, setChannel] = useState<RealtimeChannel | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  
+  // Use refs to store callbacks so they don't trigger re-renders
+  const onInsertRef = useRef(onInsert);
+  const onUpdateRef = useRef(onUpdate);
+  const onDeleteRef = useRef(onDelete);
+
+  // Update refs when callbacks change
+  useEffect(() => {
+    onInsertRef.current = onInsert;
+    onUpdateRef.current = onUpdate;
+    onDeleteRef.current = onDelete;
+  }, [onInsert, onUpdate, onDelete]);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      setIsConnected(false);
+      return;
+    }
 
     const supabase = getSupabaseClient();
     const channelName = `realtime:${table}${filter ? `:${filter}` : ""}`;
@@ -45,12 +60,12 @@ export function useRealtime<T = any>({
         },
         (payload) => {
           console.log("Realtime event:", payload);
-          if (payload.eventType === "INSERT" && onInsert) {
-            onInsert(payload.new as T);
-          } else if (payload.eventType === "UPDATE" && onUpdate) {
-            onUpdate(payload.new as T);
-          } else if (payload.eventType === "DELETE" && onDelete) {
-            onDelete(payload.old as T);
+          if (payload.eventType === "INSERT" && onInsertRef.current) {
+            onInsertRef.current(payload.new as T);
+          } else if (payload.eventType === "UPDATE" && onUpdateRef.current) {
+            onUpdateRef.current(payload.new as T);
+          } else if (payload.eventType === "DELETE" && onDeleteRef.current) {
+            onDeleteRef.current(payload.old as T);
           }
         }
       )
@@ -69,7 +84,7 @@ export function useRealtime<T = any>({
         setIsConnected(false);
       }
     };
-  }, [table, filter, enabled, onInsert, onUpdate, onDelete]);
+  }, [table, filter, enabled]);
 
   return { channel, isConnected };
 }

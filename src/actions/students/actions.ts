@@ -51,24 +51,24 @@ export async function createStudent(
     const supabase = getSupabaseAdmin();
 
     // Verify parent ownership
-    const { data: parent } = await supabase
+    const { data: parent } = await (supabase
       .from("ParentProfile")
       .select("userId, UserProfile!inner(clerkId)")
       .eq("id", validated.parentId)
-      .single();
+      .single() as unknown as Promise<{ data: { userId: string } | null; error: any }>);
 
     if (!parent) {
       throw new NotFoundError("Parent");
     }
 
-    const { data: student, error } = await supabase
+    const { data: student, error } = await (supabase
       .from("Student")
       .insert({
         id: crypto.randomUUID(),
         ...validated,
-      })
+      } as any)
       .select()
-      .single();
+      .single() as unknown as Promise<{ data: any; error: any }>);
 
     if (error) {
       throw new ValidationError(error.message);
@@ -88,7 +88,7 @@ export async function getStudent(studentId: string) {
     const validated = idSchema.parse(studentId);
     const supabase = getSupabaseAdmin();
 
-    const { data: student, error } = await supabase
+    const { data: student, error } = await (supabase
       .from("Student")
       .select(
         `
@@ -106,7 +106,7 @@ export async function getStudent(studentId: string) {
       `
       )
       .eq("id", validated)
-      .single();
+      .single() as unknown as Promise<{ data: any | null; error: any }>);
 
     if (error || !student) {
       throw new NotFoundError("Student");
@@ -135,11 +135,11 @@ export async function updateStudent(
     const supabase = getSupabaseAdmin();
 
     // Verify ownership
-    const { data: student } = await supabase
+    const { data: student } = await (supabase
       .from("Student")
       .select("parentId, ParentProfile!inner(userId, UserProfile!inner(clerkId))")
       .eq("id", validated.id)
-      .single();
+      .single() as unknown as Promise<{ data: any | null; error: any }>);
 
     if (!student) {
       throw new NotFoundError("Student");
@@ -147,12 +147,14 @@ export async function updateStudent(
 
     const { id, ...updateData } = validated;
 
-    const { data: updatedStudent, error } = await supabase
-      .from("Student")
+    const updateQuery = (supabase
+      .from("Student") as any)
       .update(updateData)
       .eq("id", id)
       .select()
       .single();
+    
+    const { data: updatedStudent, error } = await updateQuery;
 
     if (error) {
       throw new ValidationError(error.message);
@@ -179,11 +181,11 @@ export async function deleteStudent(studentId: string) {
     const supabase = getSupabaseAdmin();
 
     // Verify ownership
-    const { data: student } = await supabase
+    const { data: student } = await (supabase
       .from("Student")
       .select("parentId, ParentProfile!inner(userId, UserProfile!inner(clerkId))")
       .eq("id", validated)
-      .single();
+      .single() as unknown as Promise<{ data: any | null; error: any }>);
 
     if (!student) {
       throw new NotFoundError("Student");

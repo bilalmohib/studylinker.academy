@@ -44,34 +44,34 @@ export async function createQualification(
     const supabase = getSupabaseAdmin();
 
     // Verify user owns the teacher profile
-    const { data: user } = await supabase
+    const { data: user } = await (supabase
       .from("UserProfile")
       .select("id")
       .eq("clerkId", userId)
-      .single();
+      .single() as unknown as Promise<{ data: { id: string } | null; error: any }>);
 
     if (!user) {
       throw new UnauthorizedError();
     }
 
-    const { data: teacher } = await supabase
+    const { data: teacher } = await (supabase
       .from("TeacherProfile")
       .select("userId")
       .eq("id", validated.teacherId)
-      .single();
+      .single() as unknown as Promise<{ data: { userId: string } | null; error: any }>);
 
     if (!teacher || teacher.userId !== user.id) {
       throw new UnauthorizedError();
     }
 
-    const { data: qualification, error } = await supabase
+    const { data: qualification, error } = await (supabase
       .from("Qualification")
       .insert({
         id: crypto.randomUUID(),
         ...validated,
-      })
+      } as any)
       .select()
-      .single();
+      .single() as unknown as Promise<{ data: any; error: any }>);
 
     if (error) {
       throw new ValidationError(error.message);
@@ -95,7 +95,7 @@ export async function getQualificationsByTeacher(teacherId: string) {
       .from("Qualification")
       .select("*")
       .eq("teacherId", validated)
-      .order("year", { ascending: false, nullsLast: true });
+      .order("year", { ascending: false });
 
     if (error) {
       throw new ValidationError(error.message);
@@ -124,11 +124,11 @@ export async function updateQualification(
     const supabase = getSupabaseAdmin();
 
     // Verify ownership
-    const { data: qualification } = await supabase
+    const { data: qualification } = await (supabase
       .from("Qualification")
       .select("teacherId, TeacherProfile!inner(userId, UserProfile!inner(clerkId))")
       .eq("id", validated.id)
-      .single();
+      .single() as unknown as Promise<{ data: any | null; error: any }>);
 
     if (!qualification) {
       throw new NotFoundError("Qualification");
@@ -136,12 +136,14 @@ export async function updateQualification(
 
     const { id, ...updateData } = validated;
 
-    const { data: updatedQualification, error } = await supabase
-      .from("Qualification")
+    const updateQuery = (supabase
+      .from("Qualification") as any)
       .update(updateData)
       .eq("id", id)
       .select()
       .single();
+    
+    const { data: updatedQualification, error } = await updateQuery;
 
     if (error) {
       throw new ValidationError(error.message);
@@ -168,11 +170,11 @@ export async function deleteQualification(qualificationId: string) {
     const supabase = getSupabaseAdmin();
 
     // Verify ownership
-    const { data: qualification } = await supabase
+    const { data: qualification } = await (supabase
       .from("Qualification")
       .select("teacherId, TeacherProfile!inner(userId, UserProfile!inner(clerkId))")
       .eq("id", validated)
-      .single();
+      .single() as unknown as Promise<{ data: any | null; error: any }>);
 
     if (!qualification) {
       throw new NotFoundError("Qualification");

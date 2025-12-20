@@ -30,13 +30,13 @@ export default function OnboardingPage() {
         const result = await getCurrentUserProfile();
         if (result.success && "data" in result && result.data) {
           // User already has a profile, redirect to appropriate portal
-          const userRole = result.data.role;
-          if (userRole === "PARENT") {
-            router.push("/portal/parent");
-          } else if (userRole === "TEACHER") {
-            router.push("/portal/teacher");
-          } else if (userRole === "ADMIN" || userRole === "MANAGER") {
+          const profile = (result as { data: { role: string; isAdmin?: boolean } }).data;
+          if (profile.isAdmin === true) {
             router.push("/admin");
+          } else if (profile.role === "PARENT") {
+            router.push("/portal/parent");
+          } else if (profile.role === "TEACHER") {
+            router.push("/portal/teacher");
           } else {
             router.push("/");
           }
@@ -76,21 +76,31 @@ export default function OnboardingPage() {
 
     setIsSubmitting(true);
     try {
+      // Validate email
+      const email = user.emailAddresses[0]?.emailAddress;
+      if (!email) {
+        toast.error("Email address is required. Please add an email to your account.");
+        setIsSubmitting(false);
+        return;
+      }
+
       // Create user profile
       const userProfileResult = await createUserProfile({
         clerkId: userId,
-        email: user.emailAddresses[0]?.emailAddress || "",
-        firstName: firstName || user.firstName || "",
-        lastName: lastName || user.lastName || "",
+        email: email,
+        firstName: firstName.trim() || user.firstName || null,
+        lastName: lastName.trim() || user.lastName || null,
         role: role,
-        avatar: user.imageUrl || undefined,
+        avatar: user.imageUrl && user.imageUrl.trim() !== "" ? user.imageUrl : null,
       });
 
       if (!userProfileResult.success || !("data" in userProfileResult)) {
         const errorMessage = "error" in userProfileResult 
           ? userProfileResult.error 
           : "Failed to create user profile";
+        console.error("Profile creation error:", userProfileResult);
         toast.error(errorMessage);
+        setIsSubmitting(false);
         return;
       }
 

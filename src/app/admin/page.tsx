@@ -27,61 +27,30 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
 
   // Realtime subscriptions for live updates
-  useRealtimeTeacherApplications(() => {
-    // Refresh stats when applications change
-    const refreshStats = async () => {
-      try {
-        const [applicationsResult, contactsResult] = await Promise.all([
-          getAllTeacherApplications({ limit: 1000 }),
-          getAllContactSubmissions(),
-        ]);
-
-        if (applicationsResult.success && "data" in applicationsResult) {
-          const apps = (applicationsResult as { success: true; data: any[] }).data;
-          if (apps) {
-            setStats((prev) => ({
-              ...prev,
-              pendingApplications: apps.filter(
-                (app: any) => app.status === "PENDING" || app.status === "UNDER_REVIEW"
-              ).length,
-              totalApplications: apps.length,
-            }));
-          }
-        }
-
-        if (contactsResult.success && "data" in contactsResult && contactsResult.data) {
-          const contacts = contactsResult.data;
-          setStats((prev) => ({
-            ...prev,
-            newContacts: contacts.filter((c: any) => c.status === "NEW").length,
-            totalContacts: contacts.length,
-          }));
-        }
-      } catch (error) {
-        console.error("Error refreshing stats:", error);
-      }
-    };
-    refreshStats();
+  useRealtimeTeacherApplications((application) => {
+    // Update stats when applications change
+    setStats((prev) => {
+      const newPending = application.status === "PENDING" || application.status === "UNDER_REVIEW"
+        ? prev.pendingApplications + 1
+        : prev.pendingApplications;
+      return {
+        ...prev,
+        pendingApplications: newPending,
+        totalApplications: prev.totalApplications + 1,
+      };
+    });
   }, true);
 
-  useRealtimeContacts(() => {
-    // Refresh stats when contacts change
-    const refreshStats = async () => {
-      try {
-        const contactsResult = await getAllContactSubmissions();
-        if (contactsResult.success && "data" in contactsResult && contactsResult.data) {
-          const contacts = contactsResult.data;
-          setStats((prev) => ({
-            ...prev,
-            newContacts: contacts.filter((c: any) => c.status === "NEW").length,
-            totalContacts: contacts.length,
-          }));
-        }
-      } catch (error) {
-        console.error("Error refreshing stats:", error);
-      }
-    };
-    refreshStats();
+  useRealtimeContacts((contact) => {
+    // Update stats when contacts change
+    setStats((prev) => {
+      const newContacts = contact.status === "NEW" ? prev.newContacts + 1 : prev.newContacts;
+      return {
+        ...prev,
+        newContacts,
+        totalContacts: prev.totalContacts + 1,
+      };
+    });
   }, true);
 
   useEffect(() => {

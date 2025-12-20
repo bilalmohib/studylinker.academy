@@ -19,7 +19,7 @@ import { auth } from "@clerk/nextjs/server";
 const createPaymentSchema = z.object({
   contractId: idSchema,
   amount: z.number().positive("Amount must be positive"),
-  currency: z.string().default("USD"),
+  currency: z.string().optional().default("USD"),
   paymentMethod: z.string().optional().nullable(),
   transactionId: z.string().optional().nullable(),
 });
@@ -48,27 +48,27 @@ export async function createPayment(
     const supabase = getSupabaseAdmin();
 
     // Verify contract exists and user has access
-    const { data: contract } = await supabase
+    const { data: contract } = await (supabase
       .from("Contract")
       .select(
         "id, parentId, ParentProfile!inner(userId, UserProfile!inner(clerkId))"
       )
       .eq("id", validated.contractId)
-      .single();
+      .single() as unknown as Promise<{ data: any | null; error: any }>);
 
     if (!contract) {
       throw new NotFoundError("Contract");
     }
 
-    const { data: payment, error } = await supabase
+    const { data: payment, error } = await (supabase
       .from("Payment")
       .insert({
         id: crypto.randomUUID(),
         ...validated,
         status: "PENDING",
-      })
+      } as any)
       .select()
-      .single();
+      .single() as unknown as Promise<{ data: any; error: any }>);
 
     if (error) {
       throw new ValidationError(error.message);
@@ -88,7 +88,7 @@ export async function getPayment(paymentId: string) {
     const validated = idSchema.parse(paymentId);
     const supabase = getSupabaseAdmin();
 
-    const { data: payment, error } = await supabase
+    const { data: payment, error } = await (supabase
       .from("Payment")
       .select(
         `
@@ -120,7 +120,7 @@ export async function getPayment(paymentId: string) {
       `
       )
       .eq("id", validated)
-      .single();
+      .single() as unknown as Promise<{ data: any | null; error: any }>);
 
     if (error || !payment) {
       throw new NotFoundError("Payment");
@@ -147,13 +147,13 @@ export async function updatePayment(data: z.infer<typeof updatePaymentSchema>) {
     const supabase = getSupabaseAdmin();
 
     // Verify ownership
-    const { data: payment } = await supabase
+    const { data: payment } = await (supabase
       .from("Payment")
       .select(
         "id, contractId, Contract!inner(parentId, ParentProfile!inner(userId, UserProfile!inner(clerkId)))"
       )
       .eq("id", validated.id)
-      .single();
+      .single() as unknown as Promise<{ data: any | null; error: any }>);
 
     if (!payment) {
       throw new NotFoundError("Payment");
@@ -166,12 +166,14 @@ export async function updatePayment(data: z.infer<typeof updatePaymentSchema>) {
       updateData.paidAt = new Date().toISOString();
     }
 
-    const { data: updatedPayment, error } = await supabase
-      .from("Payment")
+    const updateQuery = (supabase
+      .from("Payment") as any)
       .update(updateData)
       .eq("id", id)
       .select()
       .single();
+    
+    const { data: updatedPayment, error } = await updateQuery;
 
     if (error) {
       throw new ValidationError(error.message);

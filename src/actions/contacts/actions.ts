@@ -35,11 +35,11 @@ export async function createContactSubmission(
     // Get userId from UserProfile if user is logged in
     let userProfileId: string | null = null;
     if (userId) {
-      const { data: userProfile } = await supabase
+      const { data: userProfile } = await (supabase
         .from("UserProfile")
         .select("id")
         .eq("clerkId", userId)
-        .single();
+        .single() as unknown as Promise<{ data: { id: string } | null; error: any }>);
 
       if (userProfile) {
         userProfileId = userProfile.id;
@@ -49,7 +49,7 @@ export async function createContactSubmission(
     // Generate ID
     const id = crypto.randomUUID();
 
-    const { data: contact, error } = await supabase
+    const { data: contact, error } = await (supabase
       .from("Contact")
       .insert({
         id,
@@ -60,9 +60,9 @@ export async function createContactSubmission(
         phone: validated.phone || null,
         userId: userProfileId,
         status: "NEW",
-      })
+      } as any)
       .select()
-      .single();
+      .single() as unknown as Promise<{ data: any; error: any }>);
 
     if (error) {
       throw new DatabaseError(error.message);
@@ -90,11 +90,11 @@ export async function getContactSubmission(id: string) {
 
     const supabase = getSupabaseAdmin();
 
-    const { data: contact, error } = await supabase
+    const { data: contact, error } = await (supabase
       .from("Contact")
       .select("*")
       .eq("id", validated)
-      .single();
+      .single() as unknown as Promise<{ data: any | null; error: any }>);
 
     if (error) {
       throw new DatabaseError(error.message);

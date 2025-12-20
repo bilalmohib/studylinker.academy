@@ -40,22 +40,22 @@ export async function createReview(data: z.infer<typeof createReviewSchema>) {
     const supabase = getSupabaseAdmin();
 
     // Verify parent ownership
-    const { data: parent } = await supabase
+    const { data: parent } = await (supabase
       .from("ParentProfile")
       .select("userId, UserProfile!inner(clerkId)")
       .eq("id", validated.parentId)
-      .single();
+      .single() as unknown as Promise<{ data: { userId: string } | null; error: any }>);
 
     if (!parent) {
       throw new NotFoundError("Parent");
     }
 
     // Verify contract exists and belongs to parent
-    const { data: contract } = await supabase
+    const { data: contract } = await (supabase
       .from("Contract")
       .select("id, parentId, teacherId")
       .eq("id", validated.contractId)
-      .single();
+      .single() as unknown as Promise<{ data: { id: string; parentId: string; teacherId: string } | null; error: any }>);
 
     if (!contract || contract.parentId !== validated.parentId) {
       throw new ValidationError("Contract does not belong to parent");
@@ -66,25 +66,25 @@ export async function createReview(data: z.infer<typeof createReviewSchema>) {
     }
 
     // Check if review already exists
-    const { data: existing } = await supabase
+    const { data: existing } = await (supabase
       .from("Review")
       .select("id")
       .eq("contractId", validated.contractId)
       .eq("parentId", validated.parentId)
-      .single();
+      .single() as unknown as Promise<{ data: { id: string } | null; error: any }>);
 
     if (existing) {
       throw new ValidationError("Review already exists for this contract");
     }
 
-    const { data: review, error } = await supabase
+    const { data: review, error } = await (supabase
       .from("Review")
       .insert({
         id: crypto.randomUUID(),
         ...validated,
-      })
+      } as any)
       .select()
-      .single();
+      .single() as unknown as Promise<{ data: any; error: any }>);
 
     if (error) {
       throw new ValidationError(error.message);
@@ -105,10 +105,10 @@ export async function createReview(data: z.infer<typeof createReviewSchema>) {
 async function updateTeacherRating(teacherId: string) {
   const supabase = getSupabaseAdmin();
 
-  const { data: reviews } = await supabase
+  const { data: reviews } = await (supabase
     .from("Review")
     .select("rating")
-    .eq("teacherId", teacherId);
+    .eq("teacherId", teacherId) as unknown as Promise<{ data: Array<{ rating: number }> | null; error: any }>);
 
   if (!reviews || reviews.length === 0) {
     return;
@@ -117,8 +117,8 @@ async function updateTeacherRating(teacherId: string) {
   const averageRating =
     reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length;
 
-  await supabase
-    .from("TeacherProfile")
+  await (supabase
+    .from("TeacherProfile") as any)
     .update({
       rating: Math.round(averageRating * 100) / 100,
       totalReviews: reviews.length,

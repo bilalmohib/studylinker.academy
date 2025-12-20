@@ -40,7 +40,8 @@ export default function ContactPage() {
           phone: "",
         });
       } else {
-        toast.error(result.error || "Failed to send message. Please try again.");
+        const errorMessage = "error" in result ? result.error : "Failed to send message. Please try again.";
+        toast.error(errorMessage);
       }
     } catch (error) {
       console.error("Error submitting contact form:", error);

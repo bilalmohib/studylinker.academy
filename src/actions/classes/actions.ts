@@ -54,11 +54,11 @@ export async function createClass(data: z.infer<typeof createClassSchema>) {
     const supabase = getSupabaseAdmin();
 
     // Verify contract exists and user has access
-    const { data: contract } = await supabase
+    const { data: contract } = await (supabase
       .from("Contract")
       .select("id, parentId, teacherId, studentId, ParentProfile!inner(userId, UserProfile!inner(clerkId)), TeacherProfile!inner(userId, UserProfile!inner(clerkId))")
       .eq("id", validated.contractId)
-      .single();
+      .single() as unknown as Promise<{ data: { id: string; parentId: string; teacherId: string; studentId: string } | null; error: any }>);
 
     if (!contract) {
       throw new NotFoundError("Contract");
@@ -72,15 +72,15 @@ export async function createClass(data: z.infer<typeof createClassSchema>) {
       throw new ValidationError("Contract details do not match");
     }
 
-    const { data: classSession, error } = await supabase
+    const { data: classSession, error } = await (supabase
       .from("Class")
       .insert({
         id: crypto.randomUUID(),
         ...validated,
         status: "SCHEDULED",
-      })
+      } as any)
       .select()
-      .single();
+      .single() as unknown as Promise<{ data: any; error: any }>);
 
     if (error) {
       throw new ValidationError(error.message);
@@ -100,7 +100,7 @@ export async function getClass(classId: string) {
     const validated = idSchema.parse(classId);
     const supabase = getSupabaseAdmin();
 
-    const { data: classSession, error } = await supabase
+    const { data: classSession, error } = await (supabase
       .from("Class")
       .select(
         `
@@ -137,7 +137,7 @@ export async function getClass(classId: string) {
       `
       )
       .eq("id", validated)
-      .single();
+      .single() as unknown as Promise<{ data: any | null; error: any }>);
 
     if (error || !classSession) {
       throw new NotFoundError("Class");
@@ -164,13 +164,13 @@ export async function updateClass(data: z.infer<typeof updateClassSchema>) {
     const supabase = getSupabaseAdmin();
 
     // Verify ownership
-    const { data: classSession } = await supabase
+    const { data: classSession } = await (supabase
       .from("Class")
       .select(
         "id, contractId, Contract!inner(parentId, teacherId, ParentProfile!inner(userId, UserProfile!inner(clerkId)), TeacherProfile!inner(userId, UserProfile!inner(clerkId)))"
       )
       .eq("id", validated.id)
-      .single();
+      .single() as unknown as Promise<{ data: any | null; error: any }>);
 
     if (!classSession) {
       throw new NotFoundError("Class");
@@ -178,12 +178,14 @@ export async function updateClass(data: z.infer<typeof updateClassSchema>) {
 
     const { id, ...updateData } = validated;
 
-    const { data: updatedClass, error } = await supabase
-      .from("Class")
+    const updateQuery = (supabase
+      .from("Class") as any)
       .update(updateData)
       .eq("id", id)
       .select()
       .single();
+    
+    const { data: updatedClass, error } = await updateQuery;
 
     if (error) {
       throw new ValidationError(error.message);

@@ -30,35 +30,41 @@ export async function createParentProfile(userId: string) {
     const supabase = getSupabaseAdmin();
 
     // Verify user exists and matches
-    const { data: user } = await supabase
+    const { data: user } = await (supabase
       .from("UserProfile")
       .select("id, clerkId")
       .eq("id", validated)
-      .single();
+      .single() as unknown as Promise<{ data: { id: string; clerkId: string } | null; error: any }>);
 
     if (!user || user.clerkId !== clerkUserId) {
       throw new UnauthorizedError();
     }
 
     // Check if parent profile already exists
-    const { data: existing } = await supabase
+    const { data: existing } = await (supabase
       .from("ParentProfile")
       .select("id")
       .eq("userId", validated)
-      .single();
+      .single() as unknown as Promise<{ data: { id: string } | null; error: any }>);
 
     if (existing) {
       return { success: true, data: existing };
     }
 
-    const { data: parent, error } = await supabase
+    // Generate UUID using Node.js crypto
+    const crypto = await import("crypto");
+    const parentId = crypto.randomUUID();
+
+    const insertData: any = {
+      id: parentId,
+      userId: validated,
+    };
+
+    const { data: parent, error } = await (supabase
       .from("ParentProfile")
-      .insert({
-        id: crypto.randomUUID(),
-        userId: validated,
-      })
+      .insert(insertData)
       .select()
-      .single();
+      .single() as unknown as Promise<{ data: any; error: any }>);
 
     if (error) {
       throw new ValidationError(error.message);
@@ -78,7 +84,7 @@ export async function getParentProfileByUserId(userId: string) {
     const validated = idSchema.parse(userId);
     const supabase = getSupabaseAdmin();
 
-    const { data: parent, error } = await supabase
+    const { data: parent, error } = await (supabase
       .from("ParentProfile")
       .select(
         `
@@ -93,7 +99,7 @@ export async function getParentProfileByUserId(userId: string) {
       `
       )
       .eq("userId", validated)
-      .single();
+      .single() as unknown as Promise<{ data: any | null; error: any }>);
 
     if (error || !parent) {
       throw new NotFoundError("Parent profile");
@@ -118,11 +124,11 @@ export async function getCurrentParentProfile() {
 
     const supabase = getSupabaseAdmin();
 
-    const { data: user } = await supabase
+    const { data: user } = await (supabase
       .from("UserProfile")
       .select("id")
       .eq("clerkId", userId)
-      .single();
+      .single() as unknown as Promise<{ data: { id: string } | null; error: any }>);
 
     if (!user) {
       throw new NotFoundError("User");

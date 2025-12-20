@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Container from "@/components/common/Container";
-import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import toast from "react-hot-toast";
+import { useAuth } from "@clerk/nextjs";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import Container from "@/components/common/Container";
 import {
   BsBriefcase,
   BsCalendar,
@@ -15,8 +18,8 @@ import {
 import { getCurrentTeacherProfile } from "@/actions/teachers/actions";
 import { getApplicationsByTeacher } from "@/actions/applications/actions";
 import { getContractsByTeacher } from "@/actions/contracts/actions";
-import { getUpcomingClassesForTeacher } from "@/actions/classes/actions";
-import toast from "react-hot-toast";
+import { getUpcomingClassesForTeacher, getClassesByContract } from "@/actions/classes/actions";
+import { checkTeacherVerification } from "@/actions/teachers/verification";
 
 interface Application {
   id: string;
@@ -55,6 +58,11 @@ export default function TeacherDashboardPage() {
     earnings: 0,
     avgRating: 0,
   });
+  const [verificationStatus, setVerificationStatus] = useState<{
+    isVerified: boolean;
+    hasApplication: boolean;
+    applicationStatus: string | null;
+  } | null>(null);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -69,15 +77,53 @@ export default function TeacherDashboardPage() {
     const fetchDashboardData = async () => {
       setLoading(true);
       try {
-        // Get teacher profile
-        const teacherResult = await getCurrentTeacherProfile();
-        if (!teacherResult.success) {
-          toast.error("Please complete your teacher profile");
+        // Check teacher verification status first
+        const verificationResult = await checkTeacherVerification();
+        if (!verificationResult.success || !verificationResult.data) {
+          toast.error("Unable to verify teacher status");
+          setLoading(false);
           return;
         }
 
-        const teacherId = teacherResult.data.id;
-        const teacherProfile = teacherResult.data;
+        const verification = verificationResult.data;
+        setVerificationStatus({
+          isVerified: verification.isVerified,
+          hasApplication: verification.hasApplication,
+          applicationStatus: verification.applicationStatus,
+        });
+
+        // If not verified and no application, redirect to application page
+        if (!verification.isVerified && !verification.hasApplication) {
+          toast.error("Please submit your teacher application first");
+          router.push("/teachers/apply");
+          setLoading(false);
+          return;
+        }
+
+        // If not verified but has application, show dashboard with application status
+        if (!verification.isVerified && verification.hasApplication) {
+          // Still load dashboard data but show application status banner
+          setLoading(false);
+          return;
+        }
+
+        // Get teacher profile (only if verified)
+        const teacherResult = await getCurrentTeacherProfile();
+        if (!teacherResult.success || !("data" in teacherResult)) {
+          toast.error("Please complete your teacher profile");
+          setLoading(false);
+          return;
+        }
+        
+        const teacherData = teacherResult.data as { id: string; rating?: number } | undefined;
+        if (!teacherData) {
+          toast.error("Please complete your teacher profile");
+          setLoading(false);
+          return;
+        }
+
+        const teacherId = teacherData.id;
+        const teacherProfile = teacherData;
 
         // Fetch all data in parallel
         const [applicationsResult, contractsResult, classesResult] = await Promise.all([
@@ -133,9 +179,10 @@ export default function TeacherDashboardPage() {
               const classesResult = await getClassesByContract(contract.id);
               let nextClass = "No upcoming classes";
               if (classesResult.success && classesResult.data && classesResult.data.length > 0) {
-                const upcoming = classesResult.data
-                  .filter((c: any) => new Date(c.scheduledAt) > new Date())
-                  .sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())[0];
+                const classes = classesResult.data as Array<{ scheduledAt: string }>;
+                const upcoming = classes
+                  .filter((c) => new Date(c.scheduledAt) > new Date())
+                  .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())[0] as { scheduledAt: string } | undefined;
                 
                 if (upcoming) {
                   const classDate = new Date(upcoming.scheduledAt);
@@ -216,7 +263,7 @@ export default function TeacherDashboardPage() {
           setStats((prev) => ({
             ...prev,
             earnings: monthlyEarnings,
-            avgRating: teacherProfile.rating || 0,
+            avgRating: (teacherProfile?.rating || 0),
           }));
         }
       } catch (error) {
@@ -232,7 +279,7 @@ export default function TeacherDashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-indigo-50 py-12">
+      <div className="min-h-screen bg-linear-to-br from-gray-50 to-indigo-50 py-12">
         <Container>
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
@@ -242,8 +289,11 @@ export default function TeacherDashboardPage() {
     );
   }
 
+  // Show application status banner if not verified
+  const showApplicationBanner = verificationStatus && !verificationStatus.isVerified && verificationStatus.hasApplication;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-indigo-50 py-12">
+    <div className="min-h-screen bg-linear-to-br from-gray-50 to-indigo-50 py-12">
       <Container>
         <div className="mb-8">
           <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">
@@ -253,6 +303,47 @@ export default function TeacherDashboardPage() {
             Manage your teaching schedule and students
           </p>
         </div>
+
+        {/* Application Status Banner */}
+        {showApplicationBanner && (
+          <div className="mb-6 bg-yellow-50 border-2 border-yellow-200 rounded-2xl p-4 sm:p-6 shadow-lg">
+            <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-yellow-100 flex items-center justify-center shrink-0">
+                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-2">
+                  Application Under Review
+                </h3>
+                <p className="text-sm sm:text-base text-gray-700 mb-4 break-words">
+                  {verificationStatus.applicationStatus === "PENDING" && 
+                    "Your teacher application has been submitted and is pending review. We'll notify you once it's been reviewed."}
+                  {verificationStatus.applicationStatus === "UNDER_REVIEW" && 
+                    "Your teacher application is currently under review by our team. We'll notify you of the outcome soon."}
+                  {verificationStatus.applicationStatus === "INTERVIEW_SCHEDULED" && 
+                    "An interview has been scheduled for your application. Please check your email for details."}
+                  {verificationStatus.applicationStatus === "INTERVIEW_COMPLETED" && 
+                    "Your interview has been completed. We're finalizing the review of your application."}
+                  {verificationStatus.applicationStatus === "REJECTED" && 
+                    "Your application was not approved. Please contact support if you have questions."}
+                  {!verificationStatus.applicationStatus && 
+                    "Your teacher application is being processed. We'll notify you once it's been reviewed."}
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                  <Button
+                    asChild
+                    variant="outline"
+                    className="border-yellow-600 text-yellow-700 hover:bg-yellow-100 text-sm sm:text-base w-full sm:w-auto"
+                  >
+                    <Link href="/teachers/apply">View Application</Link>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
@@ -298,36 +389,36 @@ export default function TeacherDashboardPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
           <Button
             asChild
-            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white p-6 rounded-2xl shadow-lg h-auto flex-col gap-2"
+            className="bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white p-4 sm:p-6 rounded-2xl shadow-lg h-auto flex-col gap-2"
           >
-            <Link href="/teachers/find-students">
-              <BsBriefcase className="w-8 h-8" />
-              <span className="text-lg font-semibold">Find Students</span>
+            <Link href="/teachers/find-students" className="flex flex-col items-center gap-2">
+              <BsBriefcase className="w-6 h-6 sm:w-8 sm:h-8" />
+              <span className="text-base sm:text-lg font-semibold">Find Students</span>
             </Link>
           </Button>
           <Button
             asChild
             variant="outline"
-            className="border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-50 p-6 rounded-2xl h-auto flex-col gap-2"
+            className="border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-50 p-4 sm:p-6 rounded-2xl h-auto flex-col gap-2"
           >
-            <Link href="/portal/teacher/schedule">
-              <BsCalendar className="w-8 h-8" />
-              <span className="text-lg font-semibold">View Schedule</span>
+            <Link href="/portal/teacher/schedule" className="flex flex-col items-center gap-2">
+              <BsCalendar className="w-6 h-6 sm:w-8 sm:h-8" />
+              <span className="text-base sm:text-lg font-semibold">View Schedule</span>
             </Link>
           </Button>
           <Button
             asChild
             variant="outline"
-            className="border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-50 p-6 rounded-2xl h-auto flex-col gap-2"
+            className="border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-50 p-4 sm:p-6 rounded-2xl h-auto flex-col gap-2"
           >
-            <Link href="/portal/teacher/earnings">
-              <BsCurrencyDollar className="w-8 h-8" />
-              <span className="text-lg font-semibold">Earnings</span>
+            <Link href="/portal/teacher/earnings" className="flex flex-col items-center gap-2">
+              <BsCurrencyDollar className="w-6 h-6 sm:w-8 sm:h-8" />
+              <span className="text-base sm:text-lg font-semibold">Earnings</span>
             </Link>
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           {/* My Students */}
           <div className="bg-white rounded-2xl p-4 sm:p-8 shadow-lg">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
@@ -355,16 +446,16 @@ export default function TeacherDashboardPage() {
                     key={student.id}
                     className="p-4 border border-gray-200 rounded-lg hover:border-indigo-300 hover:bg-indigo-50 transition-colors"
                   >
-                    <div className="flex items-start gap-4 mb-3">
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold">
+                    <div className="flex items-start gap-3 sm:gap-4 mb-3">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-linear-to-r from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold shrink-0">
                         {student.name.charAt(0)}
                       </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900">{student.name}</h3>
-                        <p className="text-sm text-gray-600">{student.subject}</p>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-gray-900 break-words">{student.name}</h3>
+                        <p className="text-sm text-gray-600 break-words">{student.subject}</p>
                       </div>
                       {student.progress > 0 && (
-                        <div className="text-right">
+                        <div className="text-right shrink-0">
                           <div className="text-sm font-semibold text-indigo-600">
                             {student.progress}%
                           </div>
@@ -372,14 +463,14 @@ export default function TeacherDashboardPage() {
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                       <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <BsCalendar className="w-4 h-4" />
-                        <span>Next: {student.nextClass}</span>
+                        <BsCalendar className="w-4 h-4 shrink-0" />
+                        <span className="break-words">Next: {student.nextClass}</span>
                       </div>
                       <Link
                         href={`/portal/teacher/students/${student.id}`}
-                        className="text-sm text-indigo-600 hover:text-indigo-700 font-semibold"
+                        className="text-sm text-indigo-600 hover:text-indigo-700 font-semibold shrink-0"
                       >
                         View →
                       </Link>
@@ -417,10 +508,10 @@ export default function TeacherDashboardPage() {
                     key={app.id}
                     className="p-4 border border-gray-200 rounded-lg hover:border-indigo-300 hover:bg-indigo-50 transition-colors"
                   >
-                    <div className="flex items-start justify-between mb-2">
-                      <h3 className="font-semibold text-gray-900">{app.jobTitle}</h3>
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-2">
+                      <h3 className="font-semibold text-gray-900 break-words flex-1 min-w-0">{app.jobTitle}</h3>
                       <span
-                        className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                        className={`px-2 py-1 text-xs font-semibold rounded-full shrink-0 ${
                           app.status === "accepted"
                             ? "bg-green-100 text-green-700"
                             : app.status === "rejected"
@@ -431,13 +522,13 @@ export default function TeacherDashboardPage() {
                         {app.status}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                       <span className="text-sm text-gray-600">
                         Applied {app.appliedDate}
                       </span>
                       <Link
                         href={`/jobs/${app.jobId}`}
-                        className="text-sm text-indigo-600 hover:text-indigo-700 font-semibold"
+                        className="text-sm text-indigo-600 hover:text-indigo-700 font-semibold shrink-0"
                       >
                         View →
                       </Link>
@@ -461,11 +552,11 @@ export default function TeacherDashboardPage() {
               <div className="space-y-4">
                 {upcomingClasses.map((classItem) => (
                   <div key={classItem.id} className="p-4 border border-gray-200 rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-semibold text-gray-900">{classItem.title}</h3>
-                      <span className="text-sm text-gray-600">{classItem.scheduledAt}</span>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+                      <h3 className="font-semibold text-gray-900 break-words flex-1">{classItem.title}</h3>
+                      <span className="text-sm text-gray-600 shrink-0">{classItem.scheduledAt}</span>
                     </div>
-                    <p className="text-sm text-gray-600">Student: {classItem.studentName}</p>
+                    <p className="text-sm text-gray-600 break-words">Student: {classItem.studentName}</p>
                   </div>
                 ))}
               </div>
@@ -479,7 +570,7 @@ export default function TeacherDashboardPage() {
             </h2>
             <div className="space-y-4">
               <div className="flex items-start gap-3">
-                <BsChatDots className="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" />
+                <BsChatDots className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
                 <div>
                   <p className="text-sm text-gray-900">
                     New message from Emma's parent
@@ -488,7 +579,7 @@ export default function TeacherDashboardPage() {
                 </div>
               </div>
               <div className="flex items-start gap-3">
-                <BsBriefcase className="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" />
+                <BsBriefcase className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
                 <div>
                   <p className="text-sm text-gray-900">
                     Application accepted for Primary English Tutor
@@ -497,7 +588,7 @@ export default function TeacherDashboardPage() {
                 </div>
               </div>
               <div className="flex items-start gap-3">
-                <BsBarChart className="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" />
+                <BsBarChart className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
                 <div>
                   <p className="text-sm text-gray-900">
                     Progress report submitted for James

@@ -39,34 +39,34 @@ export async function addTeacherSubject(
     const supabase = getSupabaseAdmin();
 
     // Verify ownership
-    const { data: user } = await supabase
+    const { data: user } = await (supabase
       .from("UserProfile")
       .select("id")
       .eq("clerkId", userId)
-      .single();
+      .single() as unknown as Promise<{ data: { id: string } | null; error: any }>);
 
     if (!user) {
       throw new NotFoundError("User");
     }
 
-    const { data: teacher } = await supabase
+    const { data: teacher } = await (supabase
       .from("TeacherProfile")
       .select("userId")
       .eq("id", validated.teacherId)
-      .single();
+      .single() as unknown as Promise<{ data: { userId: string } | null; error: any }>);
 
     if (!teacher || teacher.userId !== user.id) {
       throw new NotFoundError("Teacher");
     }
 
-    const { data: subject, error } = await supabase
+    const { data: subject, error } = await (supabase
       .from("TeacherSubject")
       .insert({
         id: crypto.randomUUID(),
         ...validated,
-      })
+      } as any)
       .select()
-      .single();
+      .single() as unknown as Promise<{ data: any; error: any }>);
 
     if (error) {
       throw new ValidationError(error.message);
@@ -93,11 +93,11 @@ export async function removeTeacherSubject(subjectId: string) {
     const supabase = getSupabaseAdmin();
 
     // Verify ownership
-    const { data: subject } = await supabase
+    const { data: subject } = await (supabase
       .from("TeacherSubject")
       .select("teacherId, TeacherProfile!inner(userId, UserProfile!inner(clerkId))")
       .eq("id", validated)
-      .single();
+      .single() as unknown as Promise<{ data: any | null; error: any }>);
 
     if (!subject) {
       throw new NotFoundError("Subject");
@@ -157,34 +157,34 @@ export async function addTeacherLevel(data: z.infer<typeof addLevelSchema>) {
     const supabase = getSupabaseAdmin();
 
     // Verify ownership
-    const { data: user } = await supabase
+    const { data: user } = await (supabase
       .from("UserProfile")
       .select("id")
       .eq("clerkId", userId)
-      .single();
+      .single() as unknown as Promise<{ data: { id: string } | null; error: any }>);
 
     if (!user) {
       throw new NotFoundError("User");
     }
 
-    const { data: teacher } = await supabase
+    const { data: teacher } = await (supabase
       .from("TeacherProfile")
       .select("userId")
       .eq("id", validated.teacherId)
-      .single();
+      .single() as unknown as Promise<{ data: { userId: string } | null; error: any }>);
 
     if (!teacher || teacher.userId !== user.id) {
       throw new NotFoundError("Teacher");
     }
 
-    const { data: level, error } = await supabase
+    const { data: level, error } = await (supabase
       .from("TeacherLevel")
       .insert({
         id: crypto.randomUUID(),
         ...validated,
-      })
+      } as any)
       .select()
-      .single();
+      .single() as unknown as Promise<{ data: any; error: any }>);
 
     if (error) {
       throw new ValidationError(error.message);

@@ -85,14 +85,13 @@ export default function AdminLayout({
       try {
         const result = await getCurrentUserProfile();
         if (result.success && "data" in result) {
-          const userData = (result as { success: true; data: { role: string } }).data;
+          const userData = (result as { success: true; data: { isAdmin?: boolean } }).data;
           if (!userData) {
             toast.error("User profile not found");
             router.push("/");
             return;
           }
-          const role = userData.role;
-          if (role === "ADMIN" || role === "MANAGER") {
+          if (userData.isAdmin === true) {
             setIsAdmin(true);
           } else {
             toast.error("Access denied. Admin privileges required.");

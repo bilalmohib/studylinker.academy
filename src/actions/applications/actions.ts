@@ -51,58 +51,58 @@ export async function createApplication(
     const supabase = getSupabaseAdmin();
 
     // Verify user is teacher and owns the teacher profile
-    const { data: user } = await supabase
+    const { data: user } = await (supabase
       .from("UserProfile")
       .select("id")
       .eq("clerkId", userId)
-      .single();
+      .single() as unknown as Promise<{ data: { id: string } | null; error: any }>);
 
     if (!user) {
       throw new UnauthorizedError();
     }
 
-    const { data: teacher } = await supabase
+    const { data: teacher } = await (supabase
       .from("TeacherProfile")
       .select("userId")
       .eq("id", validated.teacherId)
-      .single();
+      .single() as unknown as Promise<{ data: { userId: string } | null; error: any }>);
 
     if (!teacher || teacher.userId !== user.id) {
       throw new UnauthorizedError();
     }
 
     // Check if application already exists
-    const { data: existing } = await supabase
+    const { data: existing } = await (supabase
       .from("Application")
       .select("id")
       .eq("jobId", validated.jobId)
       .eq("teacherId", validated.teacherId)
-      .single();
+      .single() as unknown as Promise<{ data: { id: string } | null; error: any }>);
 
     if (existing) {
       throw new ValidationError("Application already exists");
     }
 
     // Check if job is open
-    const { data: job } = await supabase
+    const { data: job } = await (supabase
       .from("JobPosting")
       .select("status")
       .eq("id", validated.jobId)
-      .single();
+      .single() as unknown as Promise<{ data: { status: string } | null; error: any }>);
 
     if (!job || job.status !== "OPEN") {
       throw new ValidationError("Job posting is not open for applications");
     }
 
-    const { data: application, error } = await supabase
+    const { data: application, error } = await (supabase
       .from("Application")
       .insert({
         id: crypto.randomUUID(),
         ...validated,
         status: "PENDING",
-      })
+      } as any)
       .select()
-      .single();
+      .single() as unknown as Promise<{ data: any; error: any }>);
 
     if (error) {
       throw new ValidationError(error.message);
@@ -189,13 +189,13 @@ export async function updateApplication(
     const supabase = getSupabaseAdmin();
 
     // Get application and verify ownership
-    const { data: application } = await supabase
+    const { data: application } = await (supabase
       .from("Application")
       .select(
         "id, jobId, teacherId, JobPosting!inner(parentId, ParentProfile!inner(userId, UserProfile!inner(clerkId))), TeacherProfile!inner(userId, UserProfile!inner(clerkId))"
       )
       .eq("id", validated.id)
-      .single();
+      .single() as unknown as Promise<{ data: any | null; error: any }>);
 
     if (!application) {
       throw new NotFoundError("Application");
@@ -203,12 +203,14 @@ export async function updateApplication(
 
     const { id, ...updateData } = validated;
 
-    const { data: updatedApplication, error } = await supabase
-      .from("Application")
+    const updateQuery = (supabase
+      .from("Application") as any)
       .update(updateData)
       .eq("id", id)
       .select()
       .single();
+    
+    const { data: updatedApplication, error } = await updateQuery;
 
     if (error) {
       throw new ValidationError(error.message);
@@ -235,11 +237,11 @@ export async function getApplicationsByJob(jobId: string) {
     const supabase = getSupabaseAdmin();
 
     // Verify user owns the job
-    const { data: job } = await supabase
+    const { data: job } = await (supabase
       .from("JobPosting")
       .select("parentId, ParentProfile!inner(userId, UserProfile!inner(clerkId))")
       .eq("id", validated)
-      .single();
+      .single() as unknown as Promise<{ data: any | null; error: any }>);
 
     if (!job) {
       throw new NotFoundError("Job posting");
@@ -294,11 +296,11 @@ export async function getApplicationsByTeacher(teacherId: string) {
     const supabase = getSupabaseAdmin();
 
     // Verify user owns the teacher profile
-    const { data: teacher } = await supabase
+    const { data: teacher } = await (supabase
       .from("TeacherProfile")
       .select("userId, UserProfile!inner(clerkId)")
       .eq("id", validated)
-      .single();
+      .single() as unknown as Promise<{ data: { userId: string } | null; error: any }>);
 
     if (!teacher) {
       throw new NotFoundError("Teacher");

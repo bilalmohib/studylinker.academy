@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Container from "@/components/common/Container";
 import { Button } from "@/components/ui/button";
-import { BsCheckCircle, BsFileText, BsAward, BsUpload, BsX } from "react-icons/bs";
+import { BsCheckCircle, BsFileText, BsAward, BsUpload, BsX, BsFileEarmark, BsCloudUpload } from "react-icons/bs";
 import toast from "react-hot-toast";
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
@@ -12,6 +12,7 @@ import {
   getCurrentTeacherApplication,
 } from "@/actions/teacher-applications/actions";
 import { getCurrentUserProfile } from "@/actions/users/actions";
+import { uploadFile, deleteFile } from "@/actions/storage/actions";
 
 const SUBJECTS = [
   "Mathematics",
@@ -45,12 +46,22 @@ export default function ApplyPage() {
   const [formData, setFormData] = useState({
     subjects: [] as string[],
     levels: [] as string[],
-    qualifications: [] as Array<{ title: string; institution: string; year: string }>,
+    qualifications: [] as Array<{ title: string; institution: string; year: number | null }>,
     experience: "",
     resume: "",
+    resumeFile: null as { url: string; path: string; name: string } | null,
     certificates: [] as string[],
+    certificateFiles: [] as Array<{ url: string; path: string; name: string }>,
     coverLetter: "",
+    age: null as number | null,
+    photo: "",
+    photoPath: "", // Store the storage path for deletion
   });
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadingResume, setUploadingResume] = useState(false);
+  const [uploadingCertificates, setUploadingCertificates] = useState(false);
+  const [dragActiveResume, setDragActiveResume] = useState(false);
+  const [dragActiveCertificates, setDragActiveCertificates] = useState(false);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -92,8 +103,17 @@ export default function ApplyPage() {
                 qualifications: app.qualifications || [],
                 experience: app.experience || "",
                 resume: app.resume || "",
+                resumeFile: app.resume ? { url: app.resume, path: "", name: "Resume" } : null,
                 certificates: app.certificates || [],
+                certificateFiles: (app.certificates || []).map((url: string) => ({
+                  url,
+                  path: "",
+                  name: "Certificate",
+                })),
                 coverLetter: app.coverLetter || "",
+                age: app.age || null,
+                photo: app.photo || "",
+                photoPath: "", // We don't store path in DB, just URL
               });
             }
           }
@@ -131,7 +151,7 @@ export default function ApplyPage() {
       ...prev,
       qualifications: [
         ...prev.qualifications,
-        { title: "", institution: "", year: "" },
+        { title: "", institution: "", year: null },
       ],
     }));
   };
@@ -145,8 +165,8 @@ export default function ApplyPage() {
 
   const handleQualificationChange = (
     index: number,
-    field: string,
-    value: string
+    field: "title" | "institution" | "year",
+    value: string | number | null
   ) => {
     setFormData((prev) => ({
       ...prev,
@@ -154,6 +174,245 @@ export default function ApplyPage() {
         i === index ? { ...q, [field]: value } : q
       ),
     }));
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload an image file");
+      return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image size must be less than 5MB");
+      return;
+    }
+
+    setUploadingPhoto(true);
+
+    try {
+      // Delete old photo if exists
+      if (formData.photoPath) {
+        await deleteFile(formData.photoPath);
+      }
+
+      // Upload new photo
+      const result = await uploadFile(file, "teacher-photos");
+
+      if ("success" in result && result.success && "url" in result) {
+        setFormData((prev) => ({
+          ...prev,
+          photo: result.url,
+          photoPath: result.path || "",
+        }));
+        toast.success("Photo uploaded successfully!");
+      } else {
+        const errorMessage = "error" in result ? result.error : "Failed to upload photo";
+        toast.error(errorMessage);
+      }
+    } catch (error) {
+      toast.error("Failed to upload photo. Please try again.");
+    } finally {
+      setUploadingPhoto(false);
+      // Reset input
+      e.target.value = "";
+    }
+  };
+
+  const handlePhotoRemove = async () => {
+    if (formData.photoPath) {
+      try {
+        await deleteFile(formData.photoPath);
+      } catch (error) {
+        // Continue even if deletion fails
+        console.error("Failed to delete photo from storage:", error);
+      }
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      photo: "",
+      photoPath: "",
+    }));
+    toast.success("Photo removed");
+  };
+
+  const handleResumeUpload = async (file: File) => {
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain"];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error("Please upload a PDF, Word document, or text file");
+      return;
+    }
+
+    // Validate file size (10MB max)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("File size must be less than 10MB");
+      return;
+    }
+
+    setUploadingResume(true);
+
+    try {
+      // Delete old resume file if exists
+      if (formData.resumeFile?.path) {
+        await deleteFile(formData.resumeFile.path, "teacher-documents");
+      }
+
+      // Upload new resume
+      const result = await uploadFile(file, "teacher-documents", "resumes", true);
+
+      if ("success" in result && result.success && "url" in result) {
+        setFormData((prev) => ({
+          ...prev,
+          resume: result.url,
+          resumeFile: {
+            url: result.url,
+            path: result.path || "",
+            name: file.name,
+          },
+        }));
+        toast.success("Resume uploaded successfully!");
+      } else {
+        const errorMessage = "error" in result ? result.error : "Failed to upload resume";
+        toast.error(errorMessage);
+      }
+    } catch (error) {
+      toast.error("Failed to upload resume. Please try again.");
+    } finally {
+      setUploadingResume(false);
+    }
+  };
+
+  const handleResumeRemove = async () => {
+    if (formData.resumeFile?.path) {
+      try {
+        await deleteFile(formData.resumeFile.path, "teacher-documents");
+      } catch (error) {
+        console.error("Failed to delete resume from storage:", error);
+      }
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      resume: "",
+      resumeFile: null,
+    }));
+    toast.success("Resume removed");
+  };
+
+  const handleCertificateUpload = async (files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    
+    // Validate all files
+    const allowedTypes = ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain", "image/jpeg", "image/jpg", "image/png"];
+    
+    for (const file of fileArray) {
+      if (!allowedTypes.includes(file.type)) {
+        toast.error(`${file.name}: Invalid file type`);
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error(`${file.name}: File size must be less than 10MB`);
+        return;
+      }
+    }
+
+    setUploadingCertificates(true);
+
+    try {
+      const uploadPromises = fileArray.map((file) =>
+        uploadFile(file, "teacher-documents", "certificates", true)
+      );
+
+      const results = await Promise.all(uploadPromises);
+      const successfulUploads: Array<{ url: string; path: string; name: string }> = [];
+
+      results.forEach((result, index) => {
+        if ("success" in result && result.success && "url" in result) {
+          successfulUploads.push({
+            url: result.url,
+            path: result.path || "",
+            name: fileArray[index].name,
+          });
+        }
+      });
+
+      if (successfulUploads.length > 0) {
+        setFormData((prev) => ({
+          ...prev,
+          certificates: [...prev.certificates, ...successfulUploads.map((f) => f.url)],
+          certificateFiles: [...prev.certificateFiles, ...successfulUploads],
+        }));
+        toast.success(`${successfulUploads.length} certificate(s) uploaded successfully!`);
+      }
+    } catch (error) {
+      toast.error("Failed to upload certificates. Please try again.");
+    } finally {
+      setUploadingCertificates(false);
+    }
+  };
+
+  const handleCertificateRemove = async (index: number) => {
+    const fileToRemove = formData.certificateFiles[index];
+    
+    if (fileToRemove?.path) {
+      try {
+        await deleteFile(fileToRemove.path, "teacher-documents");
+      } catch (error) {
+        console.error("Failed to delete certificate from storage:", error);
+      }
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      certificates: prev.certificates.filter((_, i) => i !== index),
+      certificateFiles: prev.certificateFiles.filter((_, i) => i !== index),
+    }));
+    toast.success("Certificate removed");
+  };
+
+  const handleDrag = (e: React.DragEvent, type: "resume" | "certificates") => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (type === "resume") {
+      setDragActiveResume(true);
+    } else {
+      setDragActiveCertificates(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent, type: "resume" | "certificates") => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (type === "resume") {
+      setDragActiveResume(false);
+    } else {
+      setDragActiveCertificates(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, type: "resume" | "certificates") => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (type === "resume") {
+      setDragActiveResume(false);
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        handleResumeUpload(e.dataTransfer.files[0]);
+      }
+    } else {
+      setDragActiveCertificates(false);
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        handleCertificateUpload(e.dataTransfer.files);
+      }
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -171,6 +430,11 @@ export default function ApplyPage() {
 
     if (formData.coverLetter.length < 50) {
       toast.error("Cover letter must be at least 50 characters");
+      return;
+    }
+
+    if (!formData.age || formData.age < 18) {
+      toast.error("Please enter a valid age (18 or older)");
       return;
     }
 
@@ -202,6 +466,8 @@ export default function ApplyPage() {
         resume: formData.resume || null,
         certificates: formData.certificates.length > 0 ? formData.certificates : null,
         coverLetter: formData.coverLetter,
+        age: formData.age || null,
+        photo: formData.photo && formData.photo.trim() !== "" ? formData.photo : null,
       });
 
       if (result.success) {
@@ -257,9 +523,95 @@ export default function ApplyPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Personal Information */}
+            <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-lg">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6">
+                Personal Information
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="flex flex-col justify-center">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Age *
+                  </label>
+                  <div className="flex flex-col">
+                    <input
+                      type="number"
+                      min="18"
+                      max="100"
+                      value={formData.age ?? ""}
+                      onChange={(e) => {
+                        const ageValue = e.target.value === "" ? null : parseInt(e.target.value, 10);
+                        setFormData((prev) => ({ ...prev, age: ageValue }));
+                      }}
+                      placeholder="Enter your age"
+                      required
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    />
+                    <p className="text-xs text-gray-500 mt-1.5">Must be 18 or older</p>
+                  </div>
+                </div>
+                <div className="flex flex-col justify-center -mt-6">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Photo
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <div className="shrink-0 flex items-center justify-center">
+                      {formData.photo ? (
+                        <div className="relative">
+                          <img
+                            src={formData.photo}
+                            alt="Profile"
+                            className="w-20 h-20 rounded-full object-cover border-2 border-indigo-100 shadow-sm"
+                          />
+                          <button
+                            type="button"
+                            onClick={handlePhotoRemove}
+                            className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-md transition-colors z-10"
+                            aria-label="Remove photo"
+                          >
+                            <BsX className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="relative cursor-pointer group block">
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/jpg,image/png,image/webp"
+                            onChange={handlePhotoUpload}
+                            disabled={uploadingPhoto}
+                            className="hidden"
+                          />
+                          <div className="w-20 h-20 rounded-full border-2 border-dashed border-indigo-300 bg-indigo-50 flex flex-col items-center justify-center transition-all group-hover:border-indigo-400 group-hover:bg-indigo-100">
+                            {uploadingPhoto ? (
+                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
+                            ) : (
+                              <>
+                                <BsUpload className="w-6 h-6 text-indigo-600 mb-0.5" />
+                                <span className="text-[10px] text-indigo-600 font-medium">Upload</span>
+                              </>
+                            )}
+                          </div>
+                        </label>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0 flex items-center">
+                      <p className="text-xs text-gray-500 leading-relaxed">
+                        {formData.photo
+                          ? "Click the X to remove and upload a new photo"
+                          : "Upload your professional photo (max 5MB)"}
+                      </p>
+                      {formData.photo && (
+                        <p className="text-xs text-green-600 mt-1 font-medium">✓ Photo uploaded</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Subjects */}
             <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-lg">
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6">
                 Subjects You Teach *
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -282,7 +634,7 @@ export default function ApplyPage() {
 
             {/* Levels */}
             <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-lg">
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6">
                 Education Levels You Teach *
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -321,7 +673,7 @@ export default function ApplyPage() {
               </div>
               <div className="space-y-4">
                 {formData.qualifications.map((qual, index) => (
-                  <div key={index} className="grid grid-cols-1 sm:grid-cols-4 gap-4 p-4 border rounded-lg">
+                  <div key={index} className="grid grid-cols-1 sm:grid-cols-12 gap-3 sm:gap-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
                     <input
                       type="text"
                       placeholder="Title (e.g., BSc, MSc)"
@@ -329,7 +681,7 @@ export default function ApplyPage() {
                       onChange={(e) =>
                         handleQualificationChange(index, "title", e.target.value)
                       }
-                      className="sm:col-span-2 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      className="sm:col-span-4 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
                     />
                     <input
                       type="text"
@@ -338,26 +690,31 @@ export default function ApplyPage() {
                       onChange={(e) =>
                         handleQualificationChange(index, "institution", e.target.value)
                       }
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      className="sm:col-span-4 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
                     />
-                    <div className="flex gap-2">
+                    <div className="sm:col-span-4 flex gap-2">
                       <input
-                        type="text"
+                        type="number"
                         placeholder="Year"
-                        value={qual.year}
-                        onChange={(e) =>
-                          handleQualificationChange(index, "year", e.target.value)
-                        }
-                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                        min="1900"
+                        max="2100"
+                        value={qual.year ?? ""}
+                        onChange={(e) => {
+                          const yearValue = e.target.value === "" ? null : parseInt(e.target.value, 10);
+                          if (e.target.value === "" || (!isNaN(yearValue as number) && yearValue !== null)) {
+                            handleQualificationChange(index, "year", yearValue);
+                          }
+                        }}
+                        className="flex-1 min-w-0 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
                       />
-                      <Button
+                      <button
                         type="button"
                         onClick={() => handleRemoveQualification(index)}
-                        variant="ghost"
-                        size="sm"
+                        className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg shrink-0"
+                        aria-label="Remove qualification"
                       >
                         <BsX className="w-5 h-5" />
-                      </Button>
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -369,7 +726,7 @@ export default function ApplyPage() {
 
             {/* Experience */}
             <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-lg">
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6">
                 Teaching Experience
               </h2>
               <textarea
@@ -385,50 +742,198 @@ export default function ApplyPage() {
 
             {/* Resume & Certificates */}
             <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-lg">
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6">
                 Documents
               </h2>
-              <div className="space-y-4">
+              <div className="space-y-6">
+                {/* Resume Section */}
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Resume URL (Google Drive, Dropbox, etc.)
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    Resume
                   </label>
-                  <input
-                    type="url"
-                    value={formData.resume}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, resume: e.target.value }))
-                    }
-                    placeholder="https://..."
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  />
+                  
+                  {/* Upload Area */}
+                  <div
+                    onDragEnter={(e) => handleDrag(e, "resume")}
+                    onDragLeave={(e) => handleDragLeave(e, "resume")}
+                    onDragOver={(e) => handleDrag(e, "resume")}
+                    onDrop={(e) => handleDrop(e, "resume")}
+                    className={`relative border-2 border-dashed rounded-lg p-6 transition-colors ${
+                      dragActiveResume
+                        ? "border-indigo-500 bg-indigo-50"
+                        : "border-gray-300 bg-gray-50"
+                    }`}
+                  >
+                    {formData.resumeFile ? (
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <BsFileEarmark className="w-8 h-8 text-indigo-600" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{formData.resumeFile.name}</p>
+                            <p className="text-xs text-gray-500">Resume uploaded</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleResumeRemove}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          aria-label="Remove resume"
+                        >
+                          <BsX className="w-5 h-5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <input
+                          type="file"
+                          accept=".pdf,.doc,.docx,.txt"
+                          onChange={(e) => {
+                            if (e.target.files?.[0]) {
+                              handleResumeUpload(e.target.files[0]);
+                            }
+                          }}
+                          disabled={uploadingResume}
+                          className="hidden"
+                          id="resume-upload"
+                        />
+                        <label
+                          htmlFor="resume-upload"
+                          className="flex flex-col items-center justify-center cursor-pointer"
+                        >
+                          {uploadingResume ? (
+                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+                          ) : (
+                            <>
+                              <BsCloudUpload className="w-10 h-10 text-indigo-600 mb-2" />
+                              <p className="text-sm font-medium text-gray-700 mb-1">
+                                Click to upload or drag and drop
+                              </p>
+                              <p className="text-xs text-gray-500">PDF, DOC, DOCX, or TXT (max 10MB)</p>
+                            </>
+                          )}
+                        </label>
+                      </>
+                    )}
+                  </div>
+
+                  {/* URL Input */}
+                  <div className="mt-4">
+                    <p className="text-xs text-gray-500 mb-2">Or enter a URL:</p>
+                    <input
+                      type="url"
+                      value={formData.resume}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, resume: e.target.value }))
+                      }
+                      placeholder="https://drive.google.com/..."
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+                    />
+                  </div>
                 </div>
+
+                {/* Certificates Section */}
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Certificate URLs (one per line or comma-separated)
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    Certificates
                   </label>
-                  <textarea
-                    value={formData.certificates.join("\n")}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        certificates: e.target.value
+                  
+                  {/* Upload Area */}
+                  <div
+                    onDragEnter={(e) => handleDrag(e, "certificates")}
+                    onDragLeave={(e) => handleDragLeave(e, "certificates")}
+                    onDragOver={(e) => handleDrag(e, "certificates")}
+                    onDrop={(e) => handleDrop(e, "certificates")}
+                    className={`relative border-2 border-dashed rounded-lg p-6 transition-colors ${
+                      dragActiveCertificates
+                        ? "border-indigo-500 bg-indigo-50"
+                        : "border-gray-300 bg-gray-50"
+                    }`}
+                  >
+                    <input
+                      type="file"
+                      accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
+                      multiple
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files.length > 0) {
+                          handleCertificateUpload(e.target.files);
+                        }
+                      }}
+                      disabled={uploadingCertificates}
+                      className="hidden"
+                      id="certificates-upload"
+                    />
+                    <label
+                      htmlFor="certificates-upload"
+                      className="flex flex-col items-center justify-center cursor-pointer"
+                    >
+                      {uploadingCertificates ? (
+                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+                      ) : (
+                        <>
+                          <BsCloudUpload className="w-10 h-10 text-indigo-600 mb-2" />
+                          <p className="text-sm font-medium text-gray-700 mb-1">
+                            Click to upload or drag and drop
+                          </p>
+                          <p className="text-xs text-gray-500">PDF, DOC, DOCX, TXT, or Images (max 10MB each)</p>
+                        </>
+                      )}
+                    </label>
+                  </div>
+
+                  {/* Uploaded Certificates List */}
+                  {formData.certificateFiles.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                      {formData.certificateFiles.map((file, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
+                        >
+                          <div className="flex items-center gap-3">
+                            <BsFileEarmark className="w-5 h-5 text-indigo-600" />
+                            <p className="text-sm font-medium text-gray-900">{file.name}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleCertificateRemove(index)}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                            aria-label="Remove certificate"
+                          >
+                            <BsX className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* URL Input */}
+                  <div className="mt-4">
+                    <p className="text-xs text-gray-500 mb-2">Or enter URLs (one per line or comma-separated):</p>
+                    <textarea
+                      value={formData.certificates.filter((url) => 
+                        !formData.certificateFiles.some((f) => f.url === url)
+                      ).join("\n")}
+                      onChange={(e) => {
+                        const urlArray = e.target.value
                           .split(/[,\n]/)
                           .map((s) => s.trim())
-                          .filter((s) => s.length > 0),
-                      }))
-                    }
-                    placeholder="https://...&#10;https://..."
-                    rows={4}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  />
+                          .filter((s) => s.length > 0);
+                        setFormData((prev) => ({
+                          ...prev,
+                          certificates: [...prev.certificateFiles.map((f) => f.url), ...urlArray],
+                        }));
+                      }}
+                      placeholder="https://drive.google.com/...&#10;https://dropbox.com/..."
+                      rows={3}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Cover Letter */}
             <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-lg">
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6">
                 Cover Letter *
               </h2>
               <textarea

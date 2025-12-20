@@ -23,8 +23,8 @@ const createTeacherProfileSchema = z.object({
   timezone: z.string().optional().nullable(),
   languages: z.array(z.string()).optional().nullable(),
   hourlyRate: z.number().positive().optional().nullable(),
-  currency: z.string().default("USD"),
-  availability: z.record(z.any()).optional().nullable(),
+  currency: z.string().optional().default("USD"),
+  availability: z.record(z.string(), z.any()).optional().nullable(),
 });
 
 const updateTeacherProfileSchema = z.object({
@@ -35,7 +35,7 @@ const updateTeacherProfileSchema = z.object({
   languages: z.array(z.string()).optional().nullable(),
   hourlyRate: z.number().positive().optional().nullable(),
   currency: z.string().optional(),
-  availability: z.record(z.any()).optional().nullable(),
+  availability: z.record(z.string(), z.any()).optional().nullable(),
 });
 
 const searchTeachersSchema = z.object({
@@ -64,28 +64,41 @@ export async function createTeacherProfile(
 
     // Verify user exists and is a teacher
     const supabase = getSupabaseAdmin();
-    const { data: user } = await supabase
+    const { data: user } = await (supabase
       .from("UserProfile")
       .select("id, role")
       .eq("clerkId", userId)
-      .single();
+      .single() as unknown as Promise<{ data: { id: string; role: string } | null; error: any }>);
 
     if (!user || user.id !== validated.userId) {
       throw new UnauthorizedError();
     }
 
-    const { data: teacher, error } = await supabase
+    // Generate UUID using Node.js crypto
+    const crypto = await import("crypto");
+    const teacherId = crypto.randomUUID();
+
+    const insertData: any = {
+      id: teacherId,
+      userId: validated.userId,
+      bio: validated.bio || null,
+      location: validated.location || null,
+      timezone: validated.timezone || null,
+      languages: validated.languages || null,
+      hourlyRate: validated.hourlyRate || null,
+      currency: validated.currency || "USD",
+      availability: validated.availability || null,
+      rating: 0,
+      totalReviews: 0,
+      totalStudents: 0,
+      verified: false,
+    };
+
+    const { data: teacher, error } = await (supabase
       .from("TeacherProfile")
-      .insert({
-        id: crypto.randomUUID(),
-        ...validated,
-        rating: 0,
-        totalReviews: 0,
-        totalStudents: 0,
-        verified: false,
-      })
+      .insert(insertData)
       .select()
-      .single();
+      .single() as unknown as Promise<{ data: any; error: any }>);
 
     if (error) {
       throw new ValidationError(error.message);
@@ -105,7 +118,7 @@ export async function getTeacherProfile(teacherId: string) {
     const validated = idSchema.parse(teacherId);
     const supabase = getSupabaseAdmin();
 
-    const { data: teacher, error } = await supabase
+    const { data: teacher, error } = await (supabase
       .from("TeacherProfile")
       .select(
         `
@@ -120,7 +133,7 @@ export async function getTeacherProfile(teacherId: string) {
       `
       )
       .eq("id", validated)
-      .single();
+      .single() as unknown as Promise<{ data: any | null; error: any }>);
 
     if (error || !teacher) {
       throw new NotFoundError("Teacher");
@@ -146,22 +159,22 @@ export async function getCurrentTeacherProfile() {
     const supabase = getSupabaseAdmin();
 
     // Get user profile first
-    const { data: user } = await supabase
+    const { data: user } = await (supabase
       .from("UserProfile")
       .select("id")
       .eq("clerkId", userId)
-      .single();
+      .single() as unknown as Promise<{ data: { id: string } | null; error: any }>);
 
     if (!user) {
       throw new NotFoundError("User");
     }
 
     // Get teacher profile
-    const { data: teacher, error } = await supabase
+    const { data: teacher, error } = await (supabase
       .from("TeacherProfile")
       .select("*")
       .eq("userId", user.id)
-      .single();
+      .single() as unknown as Promise<{ data: any | null; error: any }>);
 
     if (error || !teacher) {
       throw new NotFoundError("Teacher profile");
@@ -190,21 +203,21 @@ export async function updateTeacherProfile(
     const supabase = getSupabaseAdmin();
 
     // Verify ownership
-    const { data: user } = await supabase
+    const { data: user } = await (supabase
       .from("UserProfile")
       .select("id")
       .eq("clerkId", userId)
-      .single();
+      .single() as unknown as Promise<{ data: { id: string } | null; error: any }>);
 
     if (!user) {
       throw new UnauthorizedError();
     }
 
-    const { data: teacher } = await supabase
+    const { data: teacher } = await (supabase
       .from("TeacherProfile")
       .select("userId")
       .eq("id", validated.id)
-      .single();
+      .single() as unknown as Promise<{ data: { userId: string } | null; error: any }>);
 
     if (!teacher || teacher.userId !== user.id) {
       throw new UnauthorizedError();
@@ -212,12 +225,14 @@ export async function updateTeacherProfile(
 
     const { id, ...updateData } = validated;
 
-    const { data: updatedTeacher, error } = await supabase
-      .from("TeacherProfile")
+    const updateQuery = (supabase
+      .from("TeacherProfile") as any)
       .update(updateData)
       .eq("id", id)
       .select()
       .single();
+    
+    const { data: updatedTeacher, error } = await updateQuery;
 
     if (error) {
       throw new ValidationError(error.message);

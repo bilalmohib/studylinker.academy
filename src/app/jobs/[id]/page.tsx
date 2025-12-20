@@ -16,6 +16,7 @@ import {
 import { getJobPosting } from "@/actions/jobs/actions";
 import { getApplicationsByJob } from "@/actions/applications/actions";
 import toast from "react-hot-toast";
+import { useRealtimeApplications } from "@/hooks/useRealtime";
 
 interface JobData {
   id: string;
@@ -82,7 +83,7 @@ export default function JobDetailsPage({
             hoursPerWeek: jobData.hoursPerWeek,
             budget: jobData.budget,
             postedDate: postedDateStr,
-            applications: applicationsResult.success ? applicationsResult.data.length : 0,
+            applications: applicationsResult.success && applicationsResult.data ? applicationsResult.data.length : 0,
             status: jobData.status.toLowerCase(),
             curriculum: jobData.curriculum,
             description: jobData.description,
@@ -91,7 +92,11 @@ export default function JobDetailsPage({
             parentLocation,
           });
         } else {
-          toast.error(jobResult.error || "Failed to load job posting");
+          if ('error' in jobResult) {
+            toast.error(jobResult.error || "Failed to load job posting");
+          } else {
+            toast.error("Failed to load job posting");
+          }
         }
       } catch (error) {
         console.error("Error fetching job:", error);
@@ -103,6 +108,23 @@ export default function JobDetailsPage({
 
     fetchJob();
   }, [id]);
+
+  // Realtime subscription for applications
+  useRealtimeApplications(
+    id,
+    (application) => {
+      // Update application count when new application is submitted
+      setJob((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          applications: prev.applications + 1,
+        };
+      });
+      toast.success("New application received!");
+    },
+    !!job
+  );
 
   if (loading) {
     return (

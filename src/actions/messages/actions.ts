@@ -40,25 +40,25 @@ export async function sendMessage(
     const supabase = getSupabaseAdmin();
 
     // Verify sender
-    const { data: sender } = await supabase
+    const { data: sender } = await (supabase
       .from("UserProfile")
       .select("id, clerkId")
       .eq("id", validated.senderId)
-      .single();
+      .single() as unknown as Promise<{ data: { id: string; clerkId: string } | null; error: any }>);
 
     if (!sender || sender.clerkId !== userId) {
       throw new UnauthorizedError();
     }
 
-    const { data: message, error } = await supabase
+    const { data: message, error } = await (supabase
       .from("Message")
       .insert({
         id: crypto.randomUUID(),
         ...validated,
         read: false,
-      })
+      } as any)
       .select()
-      .single();
+      .single() as unknown as Promise<{ data: any; error: any }>);
 
     if (error) {
       throw new ValidationError(error.message);
@@ -90,11 +90,11 @@ export async function getMessagesBetweenUsers(
     const supabase = getSupabaseAdmin();
 
     // Verify user is one of the participants
-    const { data: user } = await supabase
+    const { data: user } = await (supabase
       .from("UserProfile")
       .select("id, clerkId")
       .eq("clerkId", userId)
-      .single();
+      .single() as unknown as Promise<{ data: { id: string; clerkId: string } | null; error: any }>);
 
     if (!user || (user.id !== validated1 && user.id !== validated2)) {
       throw new UnauthorizedError();
@@ -154,18 +154,18 @@ export async function markMessageAsRead(messageId: string) {
     const supabase = getSupabaseAdmin();
 
     // Verify user is receiver
-    const { data: message } = await supabase
+    const { data: message } = await (supabase
       .from("Message")
       .select("receiverId, UserProfile!receiverId(clerkId)")
       .eq("id", validated)
-      .single();
+      .single() as unknown as Promise<{ data: any | null; error: any }>);
 
     if (!message) {
       throw new NotFoundError("Message");
     }
 
-    const { data: updatedMessage, error } = await supabase
-      .from("Message")
+    const updateQuery = (supabase
+      .from("Message") as any)
       .update({
         read: true,
         readAt: new Date().toISOString(),
@@ -173,6 +173,8 @@ export async function markMessageAsRead(messageId: string) {
       .eq("id", validated)
       .select()
       .single();
+    
+    const { data: updatedMessage, error } = await updateQuery;
 
     if (error) {
       throw new ValidationError(error.message);
@@ -199,11 +201,11 @@ export async function getUnreadMessageCount(userId: string) {
     const supabase = getSupabaseAdmin();
 
     // Verify user
-    const { data: user } = await supabase
+    const { data: user } = await (supabase
       .from("UserProfile")
       .select("id, clerkId")
       .eq("id", validated)
-      .single();
+      .single() as unknown as Promise<{ data: { id: string; clerkId: string } | null; error: any }>);
 
     if (!user || user.clerkId !== clerkUserId) {
       throw new UnauthorizedError();

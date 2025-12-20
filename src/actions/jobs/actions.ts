@@ -26,8 +26,8 @@ const createJobSchema = z.object({
   budget: z.string().min(1, "Budget is required"),
   description: z.string().min(1, "Description is required"),
   requirements: z.array(z.string()).optional().nullable(),
-  curriculum: z.boolean().default(false),
-  applicationMode: z.enum(["OPEN", "CURATED"]).default("OPEN"),
+  curriculum: z.boolean().optional().default(false),
+  applicationMode: z.enum(["OPEN", "CURATED"]).optional().default("OPEN"),
 });
 
 const updateJobSchema = z.object({
@@ -70,35 +70,35 @@ export async function createJobPosting(
     const supabase = getSupabaseAdmin();
 
     // Verify user is parent and owns the parent profile
-    const { data: user } = await supabase
+    const { data: user } = await (supabase
       .from("UserProfile")
       .select("id")
       .eq("clerkId", userId)
-      .single();
+      .single() as unknown as Promise<{ data: { id: string } | null; error: any }>);
 
     if (!user) {
       throw new UnauthorizedError();
     }
 
-    const { data: parent } = await supabase
+    const { data: parent } = await (supabase
       .from("ParentProfile")
       .select("userId")
       .eq("id", validated.parentId)
-      .single();
+      .single() as unknown as Promise<{ data: { userId: string } | null; error: any }>);
 
     if (!parent || parent.userId !== user.id) {
       throw new UnauthorizedError();
     }
 
-    const { data: job, error } = await supabase
+    const { data: job, error } = await (supabase
       .from("JobPosting")
       .insert({
         id: crypto.randomUUID(),
         ...validated,
         status: "OPEN",
-      })
+      } as any)
       .select()
-      .single();
+      .single() as unknown as Promise<{ data: any; error: any }>);
 
     if (error) {
       throw new ValidationError(error.message);
@@ -118,7 +118,7 @@ export async function getJobPosting(jobId: string) {
     const validated = idSchema.parse(jobId);
     const supabase = getSupabaseAdmin();
 
-    const { data: job, error } = await supabase
+    const { data: job, error } = await (supabase
       .from("JobPosting")
       .select(
         `
@@ -136,7 +136,7 @@ export async function getJobPosting(jobId: string) {
       `
       )
       .eq("id", validated)
-      .single();
+      .single() as unknown as Promise<{ data: any | null; error: any }>);
 
     if (error || !job) {
       throw new NotFoundError("Job posting");
@@ -165,11 +165,11 @@ export async function updateJobPosting(
     const supabase = getSupabaseAdmin();
 
     // Get job and verify ownership
-    const { data: job } = await supabase
+    const { data: job } = await (supabase
       .from("JobPosting")
       .select("parentId, ParentProfile!inner(userId, UserProfile!inner(clerkId))")
       .eq("id", validated.id)
-      .single();
+      .single() as unknown as Promise<{ data: any | null; error: any }>);
 
     if (!job) {
       throw new NotFoundError("Job posting");
@@ -177,12 +177,14 @@ export async function updateJobPosting(
 
     const { id, ...updateData } = validated;
 
-    const { data: updatedJob, error } = await supabase
-      .from("JobPosting")
+    const updateQuery = (supabase
+      .from("JobPosting") as any)
       .update(updateData)
       .eq("id", id)
       .select()
       .single();
+    
+    const { data: updatedJob, error } = await updateQuery;
 
     if (error) {
       throw new ValidationError(error.message);
@@ -209,11 +211,11 @@ export async function deleteJobPosting(jobId: string) {
     const supabase = getSupabaseAdmin();
 
     // Verify ownership
-    const { data: job } = await supabase
+    const { data: job } = await (supabase
       .from("JobPosting")
       .select("parentId, ParentProfile!inner(userId, UserProfile!inner(clerkId))")
       .eq("id", validated)
-      .single();
+      .single() as unknown as Promise<{ data: any | null; error: any }>);
 
     if (!job) {
       throw new NotFoundError("Job posting");

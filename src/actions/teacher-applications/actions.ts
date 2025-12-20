@@ -20,11 +20,13 @@ const createTeacherApplicationSchema = z.object({
   userId: idSchema,
   subjects: z.array(z.string()).min(1, "At least one subject is required"),
   levels: z.array(z.string()).min(1, "At least one level is required"),
-  qualifications: z.record(z.any()).optional().nullable(),
+  qualifications: z.record(z.string(), z.any()).optional().nullable(),
   experience: z.string().optional().nullable(),
   resume: z.string().url().optional().nullable(),
   certificates: z.array(z.string().url()).optional().nullable(),
   coverLetter: z.string().min(50, "Cover letter must be at least 50 characters"),
+  age: z.number().int().min(18).max(100).optional().nullable(),
+  photo: z.union([z.string().url(), z.literal("")]).optional().nullable(),
 });
 
 const updateApplicationStatusSchema = z.object({
@@ -72,11 +74,11 @@ export async function createTeacherApplication(
     const supabase = getSupabaseAdmin();
 
     // Verify user exists and matches
-    const { data: user } = await supabase
+    const { data: user } = await (supabase
       .from("UserProfile")
-      .select("id, clerkId, role")
+      .select("id, clerkId, isAdmin")
       .eq("clerkId", userId)
-      .single();
+      .single() as unknown as Promise<{ data: { id: string; clerkId: string; isAdmin?: boolean } | null; error: any }>);
 
     if (!user) {
       throw new UnauthorizedError();
@@ -87,11 +89,11 @@ export async function createTeacherApplication(
     }
 
     // Check if user already has an application
-    const { data: existing } = await supabase
+    const { data: existing } = await (supabase
       .from("TeacherApplication")
       .select("id, status")
       .eq("userId", validated.userId)
-      .single();
+      .single() as unknown as Promise<{ data: { id: string; status: string } | null; error: any }>);
 
     if (existing) {
       if (existing.status === "APPROVED") {
@@ -102,15 +104,15 @@ export async function createTeacherApplication(
       }
     }
 
-    const { data: application, error } = await supabase
+    const { data: application, error } = await (supabase
       .from("TeacherApplication")
       .insert({
         id: crypto.randomUUID(),
         ...validated,
         status: "PENDING",
-      })
+      } as any)
       .select()
-      .single();
+      .single() as unknown as Promise<{ data: any; error: any }>);
 
     if (error) {
       throw new ValidationError(error.message);
@@ -136,7 +138,7 @@ export async function getTeacherApplication(applicationId: string) {
 
     const supabase = getSupabaseAdmin();
 
-    const { data: application, error } = await supabase
+    const { data: application, error } = await (supabase
       .from("TeacherApplication")
       .select(
         `
@@ -158,24 +160,25 @@ export async function getTeacherApplication(applicationId: string) {
       `
       )
       .eq("id", validated)
-      .single();
+      .single() as unknown as Promise<{ data: any | null; error: any }>);
 
     if (error || !application) {
       throw new NotFoundError("Teacher application");
     }
 
     // Verify user owns the application or is admin
-    const { data: user } = await supabase
+    const { data: user } = await (supabase
       .from("UserProfile")
-      .select("id, role")
+      .select("id, isAdmin")
       .eq("clerkId", userId)
-      .single();
+      .single() as unknown as Promise<{ data: { id: string; isAdmin?: boolean } | null; error: any }>);
 
     if (!user) {
       throw new UnauthorizedError();
     }
 
-    if (application.userId !== user.id && user.role !== "ADMIN" && user.role !== "MANAGER") {
+    const userProfile = user as { id: string; isAdmin?: boolean };
+    if (application.userId !== userProfile.id && userProfile.isAdmin !== true) {
       throw new UnauthorizedError();
     }
 
@@ -198,23 +201,23 @@ export async function getCurrentTeacherApplication() {
 
     const supabase = getSupabaseAdmin();
 
-    const { data: user } = await supabase
+    const { data: user } = await (supabase
       .from("UserProfile")
       .select("id")
       .eq("clerkId", userId)
-      .single();
+      .single() as unknown as Promise<{ data: { id: string } | null; error: any }>);
 
     if (!user) {
       throw new NotFoundError("User");
     }
 
-    const { data: application, error } = await supabase
+    const { data: application, error } = await (supabase
       .from("TeacherApplication")
       .select("*")
       .eq("userId", user.id)
       .order("createdAt", { ascending: false })
       .limit(1)
-      .single();
+      .single() as unknown as Promise<{ data: any | null; error: any }>);
 
     if (error) {
       if (error.code === "PGRST116") {
@@ -249,14 +252,14 @@ export async function getAllTeacherApplications(
 
     const supabase = getSupabaseAdmin();
 
-    // Verify user is admin or manager
-    const { data: user } = await supabase
+    // Verify user is admin
+    const { data: user } = await (supabase
       .from("UserProfile")
-      .select("role")
+      .select("isAdmin")
       .eq("clerkId", userId)
-      .single();
+      .single() as unknown as Promise<{ data: { isAdmin?: boolean } | null; error: any }>);
 
-    if (!user || (user.role !== "ADMIN" && user.role !== "MANAGER")) {
+    if (!user || (user as { isAdmin?: boolean }).isAdmin !== true) {
       throw new UnauthorizedError("Admin access required");
     }
 
@@ -331,14 +334,14 @@ export async function updateApplicationStatus(
 
     const supabase = getSupabaseAdmin();
 
-    // Verify user is admin or manager
-    const { data: user } = await supabase
+    // Verify user is admin
+    const { data: user } = await (supabase
       .from("UserProfile")
-      .select("id, role")
+      .select("id, isAdmin")
       .eq("clerkId", userId)
-      .single();
+      .single() as unknown as Promise<{ data: { id: string; isAdmin?: boolean } | null; error: any }>);
 
-    if (!user || (user.role !== "ADMIN" && user.role !== "MANAGER")) {
+    if (!user || (user as { isAdmin?: boolean }).isAdmin !== true) {
       throw new UnauthorizedError("Admin access required");
     }
 
@@ -358,43 +361,45 @@ export async function updateApplicationStatus(
 
     // If approved, create teacher profile
     if (validated.status === "APPROVED") {
-      const { data: application } = await supabase
+      const { data: application } = await (supabase
         .from("TeacherApplication")
         .select("userId")
         .eq("id", validated.id)
-        .single();
+        .single() as unknown as Promise<{ data: { userId: string } | null; error: any }>);
 
       if (application) {
         // Check if teacher profile already exists
-        const { data: existingProfile } = await supabase
+        const { data: existingProfile } = await (supabase
           .from("TeacherProfile")
           .select("id")
           .eq("userId", application.userId)
-          .single();
+          .single() as unknown as Promise<{ data: { id: string } | null; error: any }>);
 
         if (!existingProfile) {
           // Create teacher profile
-          await supabase.from("TeacherProfile").insert({
+          await (supabase.from("TeacherProfile") as any).insert({
             id: crypto.randomUUID(),
             userId: application.userId,
             verified: true,
           });
         } else {
           // Update existing profile to verified
-          await supabase
-            .from("TeacherProfile")
+          await (supabase
+            .from("TeacherProfile") as any)
             .update({ verified: true })
             .eq("id", existingProfile.id);
         }
       }
     }
 
-    const { data: application, error } = await supabase
-      .from("TeacherApplication")
+    const updateQuery = (supabase
+      .from("TeacherApplication") as any)
       .update(updateData)
       .eq("id", validated.id)
       .select()
       .single();
+    
+    const { data: application, error } = await updateQuery;
 
     if (error) {
       throw new ValidationError(error.message);
@@ -422,19 +427,19 @@ export async function scheduleInterview(
 
     const supabase = getSupabaseAdmin();
 
-    // Verify user is admin or manager
-    const { data: user } = await supabase
+    // Verify user is admin
+    const { data: user } = await (supabase
       .from("UserProfile")
-      .select("id, role")
+      .select("id, isAdmin")
       .eq("clerkId", userId)
-      .single();
+      .single() as unknown as Promise<{ data: { id: string; isAdmin?: boolean } | null; error: any }>);
 
-    if (!user || (user.role !== "ADMIN" && user.role !== "MANAGER")) {
+    if (!user || (user as { isAdmin?: boolean }).isAdmin !== true) {
       throw new UnauthorizedError("Admin access required");
     }
 
-    const { data: application, error } = await supabase
-      .from("TeacherApplication")
+    const updateQuery = (supabase
+      .from("TeacherApplication") as any)
       .update({
         status: "INTERVIEW_SCHEDULED",
         interviewScheduledAt: validated.interviewScheduledAt,
@@ -446,6 +451,8 @@ export async function scheduleInterview(
       .eq("id", validated.id)
       .select()
       .single();
+    
+    const { data: application, error } = await updateQuery;
 
     if (error) {
       throw new ValidationError(error.message);
@@ -473,19 +480,19 @@ export async function scoreInterview(
 
     const supabase = getSupabaseAdmin();
 
-    // Verify user is admin or manager
-    const { data: user } = await supabase
+    // Verify user is admin
+    const { data: user } = await (supabase
       .from("UserProfile")
-      .select("id, role")
+      .select("id, isAdmin")
       .eq("clerkId", userId)
-      .single();
+      .single() as unknown as Promise<{ data: { id: string; isAdmin?: boolean } | null; error: any }>);
 
-    if (!user || (user.role !== "ADMIN" && user.role !== "MANAGER")) {
+    if (!user || (user as { isAdmin?: boolean }).isAdmin !== true) {
       throw new UnauthorizedError("Admin access required");
     }
 
-    const { data: application, error } = await supabase
-      .from("TeacherApplication")
+    const updateQuery = (supabase
+      .from("TeacherApplication") as any)
       .update({
         status: "INTERVIEW_COMPLETED",
         interviewScore: validated.interviewScore,
@@ -497,6 +504,8 @@ export async function scoreInterview(
       .eq("id", validated.id)
       .select()
       .single();
+    
+    const { data: application, error } = await updateQuery;
 
     if (error) {
       throw new ValidationError(error.message);

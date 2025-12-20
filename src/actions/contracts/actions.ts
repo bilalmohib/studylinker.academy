@@ -24,10 +24,10 @@ const createContractSchema = z.object({
   subject: z.string().min(1, "Subject is required"),
   level: z.string().min(1, "Level is required"),
   rate: z.number().positive("Rate must be positive"),
-  currency: z.string().default("USD"),
+  currency: z.string().optional().default("USD"),
   hoursPerWeek: z.string().min(1, "Hours per week is required"),
-  schedule: z.record(z.any()).optional().nullable(),
-  curriculum: z.boolean().default(false),
+  schedule: z.record(z.string(), z.any()).optional().nullable(),
+  curriculum: z.boolean().optional().default(false),
   startDate: z.string().datetime("Invalid start date"),
   endDate: z.string().datetime().optional().nullable(),
 });
@@ -39,7 +39,7 @@ const updateContractSchema = z.object({
   rate: z.number().positive().optional(),
   currency: z.string().optional(),
   hoursPerWeek: z.string().optional(),
-  schedule: z.record(z.any()).optional().nullable(),
+  schedule: z.record(z.string(), z.any()).optional().nullable(),
   curriculum: z.boolean().optional(),
   status: contractStatusSchema.optional(),
   startDate: z.string().datetime().optional(),
@@ -63,36 +63,36 @@ export async function createContract(
     const supabase = getSupabaseAdmin();
 
     // Verify parent ownership
-    const { data: parent } = await supabase
+    const { data: parent } = await (supabase
       .from("ParentProfile")
       .select("userId, UserProfile!inner(clerkId)")
       .eq("id", validated.parentId)
-      .single();
+      .single() as unknown as Promise<{ data: { userId: string } | null; error: any }>);
 
     if (!parent) {
       throw new NotFoundError("Parent");
     }
 
     // Verify student belongs to parent
-    const { data: student } = await supabase
+    const { data: student } = await (supabase
       .from("Student")
       .select("parentId")
       .eq("id", validated.studentId)
-      .single();
+      .single() as unknown as Promise<{ data: { parentId: string } | null; error: any }>);
 
     if (!student || student.parentId !== validated.parentId) {
       throw new ValidationError("Student does not belong to parent");
     }
 
-    const { data: contract, error } = await supabase
+    const { data: contract, error } = await (supabase
       .from("Contract")
       .insert({
         id: crypto.randomUUID(),
         ...validated,
         status: "ACTIVE",
-      })
+      } as any)
       .select()
-      .single();
+      .single() as unknown as Promise<{ data: any; error: any }>);
 
     if (error) {
       throw new ValidationError(error.message);
@@ -112,7 +112,7 @@ export async function getContract(contractId: string) {
     const validated = idSchema.parse(contractId);
     const supabase = getSupabaseAdmin();
 
-    const { data: contract, error } = await supabase
+    const { data: contract, error } = await (supabase
       .from("Contract")
       .select(
         `
@@ -150,7 +150,7 @@ export async function getContract(contractId: string) {
       `
       )
       .eq("id", validated)
-      .single();
+      .single() as unknown as Promise<{ data: any | null; error: any }>);
 
     if (error || !contract) {
       throw new NotFoundError("Contract");
@@ -179,13 +179,13 @@ export async function updateContract(
     const supabase = getSupabaseAdmin();
 
     // Verify ownership (parent or teacher)
-    const { data: contract } = await supabase
+    const { data: contract } = await (supabase
       .from("Contract")
       .select(
         "id, parentId, teacherId, ParentProfile!inner(userId, UserProfile!inner(clerkId)), TeacherProfile!inner(userId, UserProfile!inner(clerkId))"
       )
       .eq("id", validated.id)
-      .single();
+      .single() as unknown as Promise<{ data: any | null; error: any }>);
 
     if (!contract) {
       throw new NotFoundError("Contract");
@@ -193,12 +193,14 @@ export async function updateContract(
 
     const { id, ...updateData } = validated;
 
-    const { data: updatedContract, error } = await supabase
-      .from("Contract")
+    const updateQuery = (supabase
+      .from("Contract") as any)
       .update(updateData)
       .eq("id", id)
       .select()
       .single();
+    
+    const { data: updatedContract, error } = await updateQuery;
 
     if (error) {
       throw new ValidationError(error.message);

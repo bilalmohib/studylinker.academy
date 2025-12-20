@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { Toaster } from "react-hot-toast";
 import Footer from "@/components/common/Footer";
 import Navbar from "@/components/common/Navbar";
@@ -9,15 +10,20 @@ interface MainAppLayoutProps {
 }
 
 const MainAppLayout = ({ children }: MainAppLayoutProps) => {
+  const pathname = usePathname();
+  const isAdminRoute = pathname?.startsWith("/admin");
+
   return (
     <div>
-      <div className="sticky top-0 z-50 bg-white">
-        <Navbar />
-      </div>
+      {!isAdminRoute && (
+        <div className="sticky top-0 z-50 bg-white">
+          <Navbar />
+        </div>
+      )}
 
       <div className="relative z-10 !overflow-x-hidden">{children}</div>
 
-      <Footer />
+      {!isAdminRoute && <Footer />}
 
       <Toaster position="top-left" reverseOrder={false} />
     </div>

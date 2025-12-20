@@ -1,6 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/db/client";
+import { checkTeacherVerification } from "@/actions/teachers/verification";
 
 // Define protected routes that require authentication
 const isProtectedRoute = createRouteMatcher([
@@ -35,18 +36,19 @@ export default clerkMiddleware(async (auth, req) => {
         const supabase = getSupabaseAdmin();
         const { data: userProfile } = await supabase
           .from("UserProfile")
-          .select("id, role")
+          .select("id, role, isAdmin")
           .eq("clerkId", userId)
           .single();
 
         if (userProfile) {
-          const role = (userProfile as { role: string }).role;
-          if (role === "PARENT") {
-            return NextResponse.redirect(new URL("/portal/parent", req.url));
-          } else if (role === "TEACHER") {
-            return NextResponse.redirect(new URL("/portal/teacher", req.url));
-          } else if (role === "ADMIN" || role === "MANAGER") {
+          const profile = userProfile as { role: string; isAdmin?: boolean };
+          const isAdmin = profile.isAdmin === true;
+          if (isAdmin) {
             return NextResponse.redirect(new URL("/admin", req.url));
+          } else if (profile.role === "PARENT") {
+            return NextResponse.redirect(new URL("/portal/parent", req.url));
+          } else if (profile.role === "TEACHER") {
+            return NextResponse.redirect(new URL("/portal/teacher", req.url));
           }
         }
       } catch (error) {
@@ -63,7 +65,7 @@ export default clerkMiddleware(async (auth, req) => {
       const supabase = getSupabaseAdmin();
       const { data: userProfile, error } = await supabase
         .from("UserProfile")
-        .select("id, role")
+        .select("id, role, isAdmin")
         .eq("clerkId", userId)
         .single();
 
@@ -72,11 +74,37 @@ export default clerkMiddleware(async (auth, req) => {
         return NextResponse.redirect(new URL("/onboarding", req.url));
       }
 
-      // For admin routes, verify admin role
+      // For admin routes, verify admin status
       if (pathname.startsWith("/admin")) {
-        const role = (userProfile as { role: string }).role;
-        if (role !== "ADMIN" && role !== "MANAGER") {
+        const profile = userProfile as { isAdmin?: boolean };
+        if (profile.isAdmin !== true) {
           return NextResponse.redirect(new URL("/", req.url));
+        }
+      }
+
+      // For teacher routes, verify teacher status
+      const profile = userProfile as { role: string };
+      if (profile.role === "TEACHER") {
+        if (pathname.startsWith("/teachers/find-students") || (pathname.startsWith("/jobs/") && pathname.includes("/apply"))) {
+          try {
+            const verificationResult = await checkTeacherVerification();
+            if (verificationResult.success && verificationResult.data) {
+              const verification = verificationResult.data;
+              
+              // If not verified and no application, redirect to application page
+              if (!verification.isVerified && !verification.hasApplication) {
+                return NextResponse.redirect(new URL("/teachers/apply", req.url));
+              }
+              
+              // If not verified but has application, redirect to dashboard
+              if (!verification.isVerified && verification.hasApplication) {
+                return NextResponse.redirect(new URL("/portal/teacher", req.url));
+              }
+            }
+          } catch (error) {
+            console.error("Error checking teacher verification:", error);
+            // Continue if error (don't block access)
+          }
         }
       }
     } catch (error) {

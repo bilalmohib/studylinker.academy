@@ -9,6 +9,7 @@ import JobCard from "@/components/marketplace/JobCard";
 import FilterSidebar from "@/components/marketplace/FilterSidebar";
 import { searchJobPostings } from "@/actions/jobs/actions";
 import { getApplicationsByJob } from "@/actions/applications/actions";
+import { checkTeacherVerification } from "@/actions/teachers/verification";
 import toast from "react-hot-toast";
 
 interface Job {
@@ -48,6 +49,42 @@ export default function FindStudentsPage() {
     const fetchJobs = async () => {
       setLoading(true);
       try {
+        // Check teacher verification first
+        const verificationResult = await checkTeacherVerification();
+        if (!verificationResult.success || !verificationResult.data) {
+          toast.error("Unable to verify teacher status");
+          setLoading(false);
+          return;
+        }
+
+        const verification = verificationResult.data;
+
+        // If not verified, redirect based on application status
+        if (!verification.isVerified) {
+          if (!verification.hasApplication) {
+            toast.error("Please submit your teacher application first");
+            router.push("/teachers/apply");
+            setLoading(false);
+            return;
+          } else {
+            // Has application but not verified
+            const statusMessages: Record<string, string> = {
+              PENDING: "Your application is pending review. You'll be able to browse jobs once approved.",
+              UNDER_REVIEW: "Your application is under review. You'll be able to browse jobs once approved.",
+              INTERVIEW_SCHEDULED: "An interview has been scheduled. You'll be able to browse jobs once approved.",
+              INTERVIEW_COMPLETED: "Your interview is complete. You'll be able to browse jobs once approved.",
+              REJECTED: "Your application was not approved. Please contact support.",
+            };
+            const message = statusMessages[verification.applicationStatus || ""] || 
+              "Your application is being processed. You'll be able to browse jobs once approved.";
+            toast.error(message);
+            router.push("/portal/teacher");
+            setLoading(false);
+            return;
+          }
+        }
+
+        // Teacher is verified, proceed to fetch jobs
         const result = await searchJobPostings({
           status: "OPEN",
           page,
