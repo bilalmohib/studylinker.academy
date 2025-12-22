@@ -162,7 +162,7 @@ export async function createTeacherProfile(
     const teacherId = randomUUID();
     console.log("Creating new teacher profile with id:", teacherId);
 
-    const insertData = {
+    const insertData: any = {
       id: teacherId,
       userId: validated.userId,
       bio: validated.bio || null,
@@ -180,7 +180,7 @@ export async function createTeacherProfile(
 
     const { data: teacher, error: insertError } = await (supabase
       .from("TeacherProfile")
-      .insert(insertData)
+      .insert(insertData as any)
       .select()
       .maybeSingle() as unknown as Promise<{ data: any; error: any }>);
 

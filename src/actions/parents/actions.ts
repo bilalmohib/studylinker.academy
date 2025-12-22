@@ -129,14 +129,14 @@ export async function createParentProfile(userId: string) {
     const parentId = randomUUID();
     console.log("Creating new parent profile with id:", parentId);
 
-    const insertData = {
+    const insertData: any = {
       id: parentId,
       userId: validated,
     };
 
     const { data: parent, error: insertError } = await (supabase
       .from("ParentProfile")
-      .insert(insertData)
+      .insert(insertData as any)
       .select()
       .maybeSingle() as unknown as Promise<{ data: any; error: any }>);
 

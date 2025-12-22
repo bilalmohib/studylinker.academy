@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRouter, useSearchParams } from "next/navigation";
 import Container from "@/components/common/Container";
@@ -39,7 +39,7 @@ const subjects = [
   "Economics",
 ];
 
-export default function FindStudentsPage() {
+function FindStudentsPageContent() {
   const { userId, isLoaded } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -332,32 +332,45 @@ export default function FindStudentsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Filters Sidebar */}
           <div className="lg:col-span-1 order-2 lg:order-1">
-            <FilterSidebar 
-              type="jobs" 
-              onFilterChange={(newFilters) => {
-                setFilters(newFilters);
-                setPage(1); // Reset to first page when filters change
-                
-                // Update URL with new filters
-                const params = new URLSearchParams();
-                if (newFilters.subjects && newFilters.subjects.length > 0) {
-                  params.set("subjects", newFilters.subjects.join(","));
-                }
-                if (newFilters.levels && newFilters.levels.length > 0) {
-                  params.set("levels", newFilters.levels.join(","));
-                }
-                if (newFilters.minPrice !== undefined && newFilters.minPrice !== null) {
-                  params.set("minPrice", newFilters.minPrice.toString());
-                }
-                if (newFilters.maxPrice !== undefined && newFilters.maxPrice !== null) {
-                  params.set("maxPrice", newFilters.maxPrice.toString());
-                }
-                
-                // Update URL without page reload
-                const newUrl = params.toString() ? `/teachers/find-students?${params.toString()}` : "/teachers/find-students";
-                router.push(newUrl, { scroll: false });
-              }}
-            />
+            <Suspense fallback={
+              <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-lg h-fit lg:sticky lg:top-4">
+                <div className="animate-pulse">
+                  <div className="h-6 bg-gray-200 rounded mb-4"></div>
+                  <div className="space-y-3">
+                    <div className="h-4 bg-gray-200 rounded"></div>
+                    <div className="h-4 bg-gray-200 rounded"></div>
+                    <div className="h-4 bg-gray-200 rounded"></div>
+                  </div>
+                </div>
+              </div>
+            }>
+              <FilterSidebar 
+                type="jobs" 
+                onFilterChange={(newFilters) => {
+                  setFilters(newFilters);
+                  setPage(1); // Reset to first page when filters change
+                  
+                  // Update URL with new filters
+                  const params = new URLSearchParams();
+                  if (newFilters.subjects && newFilters.subjects.length > 0) {
+                    params.set("subjects", newFilters.subjects.join(","));
+                  }
+                  if (newFilters.levels && newFilters.levels.length > 0) {
+                    params.set("levels", newFilters.levels.join(","));
+                  }
+                  if (newFilters.minPrice !== undefined && newFilters.minPrice !== null) {
+                    params.set("minPrice", newFilters.minPrice.toString());
+                  }
+                  if (newFilters.maxPrice !== undefined && newFilters.maxPrice !== null) {
+                    params.set("maxPrice", newFilters.maxPrice.toString());
+                  }
+                  
+                  // Update URL without page reload
+                  const newUrl = params.toString() ? `/teachers/find-students?${params.toString()}` : "/teachers/find-students";
+                  router.push(newUrl, { scroll: false });
+                }}
+              />
+            </Suspense>
           </div>
 
           {/* Jobs Grid */}
@@ -464,6 +477,18 @@ export default function FindStudentsPage() {
         </div>
       </Container>
     </div>
+  );
+}
+
+export default function FindStudentsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-indigo-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    }>
+      <FindStudentsPageContent />
+    </Suspense>
   );
 }
 

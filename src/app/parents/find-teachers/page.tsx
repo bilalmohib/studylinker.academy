@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import Container from "@/components/common/Container";
@@ -28,7 +28,7 @@ interface Teacher {
   avatar?: string;
 }
 
-export default function FindTeachersPage() {
+function FindTeachersPageContent() {
   const { userId, isLoaded } = useAuth();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
@@ -172,7 +172,20 @@ export default function FindTeachersPage() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Filters Sidebar */}
           <div className="lg:col-span-1 order-2 lg:order-1">
-            <FilterSidebar type="teachers" />
+            <Suspense fallback={
+              <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-lg h-fit lg:sticky lg:top-4">
+                <div className="animate-pulse">
+                  <div className="h-6 bg-gray-200 rounded mb-4"></div>
+                  <div className="space-y-3">
+                    <div className="h-4 bg-gray-200 rounded"></div>
+                    <div className="h-4 bg-gray-200 rounded"></div>
+                    <div className="h-4 bg-gray-200 rounded"></div>
+                  </div>
+                </div>
+              </div>
+            }>
+              <FilterSidebar type="teachers" />
+            </Suspense>
           </div>
 
           {/* Teachers Grid */}
@@ -258,3 +271,14 @@ export default function FindTeachersPage() {
   );
 }
 
+export default function FindTeachersPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-indigo-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    }>
+      <FindTeachersPageContent />
+    </Suspense>
+  );
+}

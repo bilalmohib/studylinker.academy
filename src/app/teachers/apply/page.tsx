@@ -115,10 +115,17 @@ export default function ApplyPage() {
               let qualificationsArray: Array<{ title: string; institution: string; year: number | null }> = [];
               if (app.qualifications) {
                 if (Array.isArray(app.qualifications)) {
-                  qualificationsArray = app.qualifications;
-                } else if (typeof app.qualifications === 'object') {
+                  qualificationsArray = app.qualifications as Array<{ title: string; institution: string; year: number | null }>;
+                } else if (typeof app.qualifications === 'object' && app.qualifications !== null) {
                   // Convert object to array
-                  qualificationsArray = Object.values(app.qualifications).filter((q: any) => q && typeof q === 'object');
+                  const values = Object.values(app.qualifications) as any[];
+                  qualificationsArray = values
+                    .filter((q: any) => q && typeof q === 'object' && 'title' in q)
+                    .map((q: any) => ({
+                      title: q.title || '',
+                      institution: q.institution || '',
+                      year: q.year || null
+                    })) as Array<{ title: string; institution: string; year: number | null }>;
                 }
               }
               
