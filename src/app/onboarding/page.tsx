@@ -23,35 +23,73 @@ export default function OnboardingPage() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    if (!isLoaded || !userId) return;
+    if (!isLoaded) return;
+
+    // If no userId, redirect to signup
+    if (!userId) {
+      router.push("/sign-up");
+      return;
+    }
 
     const checkProfile = async () => {
       try {
         const result = await getCurrentUserProfile();
+        
+        // Check if result is successful and has data
         if (result.success && "data" in result && result.data) {
           // User already has a profile, redirect to appropriate portal
-          const profile = (result as { data: { role: string; isAdmin?: boolean } }).data;
+          const profile = result.data as { role: string; isAdmin?: boolean };
           if (profile.isAdmin === true) {
             router.push("/admin");
+            return;
           } else if (profile.role === "PARENT") {
             router.push("/portal/parent");
+            return;
           } else if (profile.role === "TEACHER") {
             router.push("/portal/teacher");
+            return;
           } else {
             router.push("/");
-          }
-        } else {
-          // No profile exists, show onboarding
-          setChecking(false);
-          if (user) {
-            setFirstName(user.firstName || "");
-            setLastName(user.lastName || "");
+            return;
           }
         }
+        
+        // No profile exists (result.data is null or undefined)
+        // Check if user object exists from Clerk
+        if (!user) {
+          // No Clerk user found, redirect to signup
+          router.push("/sign-up");
+          return;
+        }
+        
+        // User exists in Clerk but no profile in database, show onboarding
+        setChecking(false);
+        setFirstName(user.firstName || "");
+        setLastName(user.lastName || "");
       } catch (error) {
         console.error("Error checking profile:", error);
-        setChecking(false);
+        // On error, redirect to signup to ensure proper signup flow
+        router.push("/sign-up");
+        return;
       }
+    };
+
+    checkProfile();
+  }, [userId, isLoaded, router, user]);
+
+  // Additional check: if no userId after loading, redirect to signup
+  useEffect(() => {
+    if (isLoaded && !userId) {
+      router.push("/sign-up");
+    }
+  }, [isLoaded, userId, router]);
+
+  // Redirect to signup if no user after loading
+  useEffect(() => {
+    if (isLoaded && !userId) {
+      router.push("/sign-up");
+    }
+  }, [isLoaded, userId, router]);
     };
 
     checkProfile();
@@ -143,8 +181,9 @@ export default function OnboardingPage() {
     );
   }
 
-  if (!userId) {
-    router.push("/sign-in");
+  // If no userId or user object, redirect to signup
+  if (!userId || !user) {
+    router.push("/sign-up");
     return null;
   }
 

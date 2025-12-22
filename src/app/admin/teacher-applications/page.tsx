@@ -14,6 +14,7 @@ import {
   BsX,
   BsPencil,
   BsSave,
+  BsEnvelope,
 } from "react-icons/bs";
 import toast from "react-hot-toast";
 import { useAuth } from "@clerk/nextjs";
@@ -24,6 +25,7 @@ import {
   scheduleInterview,
   scoreInterview,
   getTeacherApplication,
+  sendInterviewEmail,
 } from "@/actions/teacher-applications/actions";
 import { useRealtimeTeacherApplications } from "@/hooks/useRealtime";
 
@@ -81,8 +83,6 @@ export default function AdminTeacherApplicationsPage() {
     interviewNotes: "",
   });
   const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
-  const [autoGenerateMeeting, setAutoGenerateMeeting] = useState(true);
-  const [generatedMeetingLink, setGeneratedMeetingLink] = useState<string | null>(null);
   const [scoreData, setScoreData] = useState({
     interviewScore: "",
     maxInterviewScore: "100",
@@ -92,6 +92,7 @@ export default function AdminTeacherApplicationsPage() {
     rejectionReason: "",
     adminNotes: "",
   });
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [isEditingInterview, setIsEditingInterview] = useState(false);
   const [editInterviewData, setEditInterviewData] = useState({
     interviewScheduledAt: "",
@@ -234,8 +235,8 @@ export default function AdminTeacherApplicationsPage() {
       return;
     }
 
-    if (!autoGenerateMeeting && !interviewData.interviewLink) {
-      toast.error("Please provide a meeting link or enable auto-generation");
+    if (!interviewData.interviewLink) {
+      toast.error("Please provide a meeting link");
       return;
     }
 
@@ -247,35 +248,15 @@ export default function AdminTeacherApplicationsPage() {
       const result = await scheduleInterview({
         id: selectedApplication.id,
         interviewScheduledAt: isoDateTime,
-        interviewLink: autoGenerateMeeting ? null : interviewData.interviewLink || null,
+        interviewLink: interviewData.interviewLink || null,
         interviewNotes: interviewData.interviewNotes || null,
       });
 
       if (result.success && "data" in result) {
-        const meetingLink = result.data.interviewLink;
-        if (meetingLink) {
-          setGeneratedMeetingLink(meetingLink);
-          toast.success(
-            `Interview scheduled successfully! Email sent to teacher. Meeting Link: ${meetingLink}`,
-            { duration: 10000 }
-          );
-        } else {
-          toast.success("Interview scheduled successfully! Email sent to teacher.");
-        }
-        // Show meeting link in modal before closing
-        if (meetingLink) {
-          // Keep modal open for 3 seconds to show the link, then close
-          setTimeout(() => {
-            setShowInterviewModal(false);
-            setSelectedApplication(null);
-            setGeneratedMeetingLink(null);
-          }, 3000);
-        } else {
-          setShowInterviewModal(false);
-          setSelectedApplication(null);
-        }
+        toast.success("Interview scheduled successfully!");
+        setShowInterviewModal(false);
+        setSelectedApplication(null);
         setInterviewData({ interviewScheduledAt: "", interviewLink: "", interviewNotes: "" });
-        setAutoGenerateMeeting(true);
         fetchApplications();
       } else {
         toast.error("error" in result ? result.error : "Failed to schedule interview");
@@ -641,9 +622,28 @@ export default function AdminTeacherApplicationsPage() {
                 {selectedApplication.qualifications && (
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-2">Qualifications</h3>
-                    <pre className="text-gray-700 whitespace-pre-wrap">
-                      {JSON.stringify(selectedApplication.qualifications, null, 2)}
-                    </pre>
+                    <div className="space-y-3">
+                      {Object.values(selectedApplication.qualifications).map((qual: any, index: number) => (
+                        <div key={index} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                          <div className="flex items-start gap-3">
+                            <div className="flex-shrink-0 w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center">
+                              <span className="text-indigo-600 font-bold text-lg">{index + 1}</span>
+                            </div>
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-gray-900 text-lg mb-1">
+                                {qual.title || "N/A"}
+                              </h4>
+                              <p className="text-gray-700 mb-1">
+                                <span className="font-medium">Institution:</span> {qual.institution || "N/A"}
+                              </p>
+                              <p className="text-gray-600 text-sm">
+                                <span className="font-medium">Year:</span> {qual.year || "N/A"}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
                 {selectedApplication.experience && (
@@ -871,9 +871,47 @@ export default function AdminTeacherApplicationsPage() {
                               >
                                 {selectedApplication.interviewLink}
                               </a>
-                              <p className="text-xs text-gray-500">
-                                Click the link above to join the Google Meet interview
+                              <p className="text-xs text-gray-500 mb-3">
+                                Click the link above to join the meeting interview
                               </p>
+                              {/* Send Email Button */}
+                              <Button
+                                onClick={async () => {
+                                  if (!selectedApplication) return;
+                                  
+                                  if (!selectedApplication.interviewLink) {
+                                    toast.error("Meeting link is required to send email");
+                                    return;
+                                  }
+                                  
+                                  if (!selectedApplication.interviewScheduledAt) {
+                                    toast.error("Interview date and time must be set");
+                                    return;
+                                  }
+
+                                  setIsSendingEmail(true);
+                                  try {
+                                    const result = await sendInterviewEmail(selectedApplication.id);
+                                    
+                                    if (result.success) {
+                                      toast.success("Interview email sent successfully to teacher!");
+                                    } else {
+                                      toast.error("error" in result ? result.error : "Failed to send email");
+                                    }
+                                  } catch (error) {
+                                    console.error("Error sending email:", error);
+                                    toast.error("An error occurred while sending email");
+                                  } finally {
+                                    setIsSendingEmail(false);
+                                  }
+                                }}
+                                disabled={isSendingEmail || !selectedApplication.interviewLink || !selectedApplication.interviewScheduledAt}
+                                className="w-full"
+                                variant="default"
+                              >
+                                <BsEnvelope className="w-4 h-4 mr-2" />
+                                {isSendingEmail ? "Sending Email..." : "Send Interview Email"}
+                              </Button>
                             </div>
                           ) : (
                             <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
@@ -939,50 +977,25 @@ export default function AdminTeacherApplicationsPage() {
                   />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <input
-                      type="checkbox"
-                      id="autoGenerateMeeting"
-                      checked={autoGenerateMeeting}
-                      onChange={(e) => setAutoGenerateMeeting(e.target.checked)}
-                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                    />
-                    <label htmlFor="autoGenerateMeeting" className="text-sm font-semibold text-gray-700">
-                      Automatically create Google Meet link
-                    </label>
-                  </div>
-                  {!autoGenerateMeeting && (
-                    <input
-                      type="url"
-                      value={interviewData.interviewLink}
-                      onChange={(e) =>
-                        setInterviewData((prev) => ({
-                          ...prev,
-                          interviewLink: e.target.value,
-                        }))
-                      }
-                      placeholder="https://meet.google.com/..."
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 mt-2"
-                    />
-                  )}
-                  {autoGenerateMeeting && (
-                    <p className="text-sm text-gray-500 mt-1">
-                      A Google Meet link will be automatically created and sent via email
-                    </p>
-                  )}
-                  {generatedMeetingLink && (
-                    <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                      <p className="text-sm font-semibold text-green-800 mb-1">Generated Meeting Link:</p>
-                      <a
-                        href={generatedMeetingLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-green-700 underline break-all hover:text-green-900"
-                      >
-                        {generatedMeetingLink}
-                      </a>
-                    </div>
-                  )}
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Meeting Link *
+                  </label>
+                  <input
+                    type="url"
+                    value={interviewData.interviewLink}
+                    onChange={(e) =>
+                      setInterviewData((prev) => ({
+                        ...prev,
+                        interviewLink: e.target.value,
+                      }))
+                    }
+                    placeholder="https://meet.google.com/..."
+                    required
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Enter a Google Meet link or any other meeting platform URL
+                  </p>
                 </div>
                 <div>
                   <div className="flex items-center justify-between mb-2">
@@ -1021,8 +1034,6 @@ export default function AdminTeacherApplicationsPage() {
                     onClick={() => {
                       setShowInterviewModal(false);
                       setInterviewData({ interviewScheduledAt: "", interviewLink: "", interviewNotes: "" });
-                      setAutoGenerateMeeting(true);
-                      setGeneratedMeetingLink(null);
                     }}
                     variant="outline"
                   >

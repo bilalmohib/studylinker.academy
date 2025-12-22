@@ -457,41 +457,13 @@ export async function scheduleInterview(
       throw new NotFoundError("Teacher application");
     }
 
-    let meetingLink = validated.interviewLink;
-
-    // Create Google Meet meeting if link not provided
-    if (!meetingLink) {
-      try {
-        const meetResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/create-google-meet`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            meetingTitle: `Interview - ${applicationData.UserProfile?.firstName || "Teacher"} ${applicationData.UserProfile?.lastName || ""}`,
-            startTime: validated.interviewScheduledAt,
-          }),
-        });
-
-        if (meetResponse.ok) {
-          const meetData = await meetResponse.json();
-          meetingLink = meetData.meetingUri || meetData.meetingCode 
-            ? `https://meet.google.com/${meetData.meetingCode || meetData.meetingUri.split("/").pop()}`
-            : null;
-        }
-      } catch (error) {
-        console.error("Error creating Google Meet meeting:", error);
-        // Continue without meeting link if creation fails
-      }
-    }
-
     // Update application
     const updateQuery = (supabase
       .from("TeacherApplication") as any)
       .update({
         status: "INTERVIEW_SCHEDULED",
         interviewScheduledAt: validated.interviewScheduledAt,
-        interviewLink: meetingLink || validated.interviewLink,
+        interviewLink: validated.interviewLink || null,
         interviewNotes: validated.interviewNotes || null,
         reviewedBy: user.id,
         reviewedAt: new Date().toISOString(),
@@ -506,30 +478,95 @@ export async function scheduleInterview(
       throw new ValidationError(error.message);
     }
 
-    // Send email notification to teacher
-    if (applicationData.UserProfile?.email && meetingLink) {
-      try {
-        const { generateInterviewInvitationEmail, sendEmail } = await import("@/lib/utils/email");
-        
-        const emailHtml = generateInterviewInvitationEmail(
-          `${applicationData.UserProfile.firstName} ${applicationData.UserProfile.lastName}`,
-          validated.interviewScheduledAt,
-          meetingLink,
-          validated.interviewNotes || undefined
-        );
+    return { success: true, data: application };
+  } catch (error) {
+    return { success: false, ...handleError(error) };
+  }
+}
 
-        await sendEmail({
-          to: applicationData.UserProfile.email,
-          subject: `Interview Invitation - StudyLinker Academy`,
-          html: emailHtml,
-        });
-      } catch (error) {
-        console.error("Error sending email:", error);
-        // Don't fail the entire operation if email fails
-      }
+/**
+ * Send interview email to teacher (admin only)
+ */
+export async function sendInterviewEmail(applicationId: string) {
+  try {
+    const validated = idSchema.parse(applicationId);
+    const { userId } = await auth();
+
+    if (!userId) {
+      throw new UnauthorizedError();
     }
 
-    return { success: true, data: application };
+    const supabase = getSupabaseAdmin();
+
+    // Verify user is admin
+    const { data: user } = await (supabase
+      .from("UserProfile")
+      .select("id, isAdmin")
+      .eq("clerkId", userId)
+      .single() as unknown as Promise<{ data: { id: string; isAdmin?: boolean } | null; error: any }>);
+
+    if (!user || (user as { isAdmin?: boolean }).isAdmin !== true) {
+      throw new UnauthorizedError("Admin access required");
+    }
+
+    // Get application with user details
+    const { data: applicationData } = await (supabase
+      .from("TeacherApplication")
+      .select(`
+        *,
+        UserProfile:userId (
+          id,
+          firstName,
+          lastName,
+          email
+        )
+      `)
+      .eq("id", validated)
+      .single() as unknown as Promise<{ data: any | null; error: any }>);
+
+    if (!applicationData) {
+      throw new NotFoundError("Teacher application");
+    }
+
+    // Validate required fields
+    if (!applicationData.interviewScheduledAt) {
+      throw new ValidationError("Interview date and time must be scheduled first");
+    }
+
+    if (!applicationData.interviewLink) {
+      throw new ValidationError("Meeting link is required to send email");
+    }
+
+    if (!applicationData.UserProfile?.email) {
+      throw new ValidationError("Teacher email not found");
+    }
+
+    // Send email notification to teacher
+    try {
+      const { generateInterviewInvitationEmail, sendEmail } = await import("@/lib/utils/email");
+      
+      const emailHtml = generateInterviewInvitationEmail(
+        `${applicationData.UserProfile.firstName} ${applicationData.UserProfile.lastName}`,
+        applicationData.interviewScheduledAt,
+        applicationData.interviewLink,
+        applicationData.interviewNotes || undefined
+      );
+
+      const emailResult = await sendEmail({
+        to: applicationData.UserProfile.email,
+        subject: `Interview Invitation - StudyLinker Academy`,
+        html: emailHtml,
+      });
+
+      if (!emailResult.success) {
+        throw new ValidationError(emailResult.error || "Failed to send email");
+      }
+
+      return { success: true, message: "Email sent successfully" };
+    } catch (error) {
+      console.error("Error sending email:", error);
+      throw new ValidationError(error instanceof Error ? error.message : "Failed to send email");
+    }
   } catch (error) {
     return { success: false, ...handleError(error) };
   }

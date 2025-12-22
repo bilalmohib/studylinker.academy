@@ -45,14 +45,20 @@ export async function createUserProfile(data: z.infer<typeof createUserSchema>) 
     const supabase = getSupabaseAdmin();
 
     // Check if user already exists
-    const { data: existingUser } = await supabase
+    const { data: existingUser, error: checkError } = await (supabase
       .from("UserProfile")
       .select("id")
       .eq("clerkId", validated.clerkId)
-      .single();
+      .single() as unknown as Promise<{ data: any | null; error: any }>);
 
+    // If user exists, return it (ignore "not found" errors)
     if (existingUser) {
       return { success: true, data: existingUser };
+    }
+
+    // If error is not "not found", it's a real error
+    if (checkError && checkError.code !== "PGRST116" && !checkError.message?.includes("No rows")) {
+      throw new ValidationError(checkError.message || "Failed to check existing user");
     }
 
     // Generate UUID using Node.js crypto
@@ -119,18 +125,31 @@ export async function getUserProfileByClerkId(clerkId: string) {
     const validated = z.string().min(1).parse(clerkId);
     const supabase = getSupabaseAdmin();
 
-    const { data: user, error } = await supabase
+    const { data: user, error } = await (supabase
       .from("UserProfile")
       .select("*")
       .eq("clerkId", validated)
-      .single();
+      .single() as unknown as Promise<{ data: any | null; error: any }>);
 
-    if (error || !user) {
+    // Handle case where user doesn't exist (not an error, just no data)
+    if (error) {
+      // Check if it's a "not found" error (PGRST116 is Supabase's "no rows returned" error)
+      if (error.code === "PGRST116" || error.message?.includes("No rows")) {
+        return { success: true, data: null };
+      }
       throw new NotFoundError("User");
+    }
+
+    if (!user) {
+      return { success: true, data: null };
     }
 
     return { success: true, data: user };
   } catch (error) {
+    // Only return error if it's not a "not found" case
+    if (error instanceof NotFoundError) {
+      return { success: true, data: null };
+    }
     return { success: false, ...handleError(error) };
   }
 }
@@ -143,12 +162,14 @@ export async function getCurrentUserProfile() {
     const { userId } = await auth();
 
     if (!userId) {
-      throw new NotFoundError("User");
+      return { success: true, data: null };
     }
 
     return await getUserProfileByClerkId(userId);
   } catch (error) {
-    return { success: false, ...handleError(error) };
+    console.error("Error in getCurrentUserProfile:", error);
+    // Return success with null data if user not found (not an error state)
+    return { success: true, data: null };
   }
 }
 
