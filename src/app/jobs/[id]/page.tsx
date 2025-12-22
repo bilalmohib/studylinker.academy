@@ -15,8 +15,10 @@ import {
 } from "react-icons/bs";
 import { getJobPosting } from "@/actions/jobs/actions";
 import { getApplicationsByJob } from "@/actions/applications/actions";
+import { getCurrentUserProfile } from "@/actions/users/actions";
 import toast from "react-hot-toast";
 import { useRealtimeApplications } from "@/hooks/useRealtime";
+import { useAuth } from "@clerk/nextjs";
 
 interface JobData {
   id: string;
@@ -42,8 +44,23 @@ export default function JobDetailsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const { userId, isLoaded } = useAuth();
   const [job, setJob] = useState<JobData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  // Fetch user role to determine what to show
+  useEffect(() => {
+    if (!isLoaded || !userId) return;
+    
+    const fetchUserRole = async () => {
+      const result = await getCurrentUserProfile();
+      if (result.success && result.data) {
+        setUserRole((result.data as { role?: string }).role || null);
+      }
+    };
+    fetchUserRole();
+  }, [userId, isLoaded]);
 
   useEffect(() => {
     const fetchJob = async () => {
@@ -264,8 +281,8 @@ export default function JobDetailsPage({
             </div>
           </div>
 
-          {/* Apply Section */}
-          {job.status === "open" && (
+          {/* Apply Section - Only show for teachers, not parents */}
+          {job.status === "open" && userRole !== "PARENT" && (
             <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 sm:p-8 text-white shadow-lg">
               <h2 className="text-xl sm:text-2xl font-bold mb-4">Ready to Apply?</h2>
               <p className="text-sm sm:text-base text-white/90 mb-6">

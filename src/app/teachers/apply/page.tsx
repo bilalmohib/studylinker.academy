@@ -13,6 +13,11 @@ import {
 } from "@/actions/teacher-applications/actions";
 import { getCurrentUserProfile } from "@/actions/users/actions";
 import { uploadFile, deleteFile } from "@/actions/storage/actions";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const SUBJECTS = [
   "Mathematics",
@@ -84,6 +89,14 @@ export default function ApplyPage() {
           return;
         }
 
+        // Check if user is a parent - parents cannot apply as teachers
+        const profile = userResult.data as { role?: string };
+        if (profile.role === "PARENT") {
+          toast.error("This page is for teachers only. Parents cannot apply as teachers.");
+          router.push("/portal/parent");
+          return;
+        }
+
         if (applicationResult.success && "data" in applicationResult) {
           const app = applicationResult.data as any;
           if (app) {
@@ -97,10 +110,22 @@ export default function ApplyPage() {
 
             if (app.status === "PENDING" || app.status === "UNDER_REVIEW") {
               toast("You already have a pending application", { icon: "ℹ️" });
+              
+              // Convert qualifications from object to array if needed
+              let qualificationsArray: Array<{ title: string; institution: string; year: number | null }> = [];
+              if (app.qualifications) {
+                if (Array.isArray(app.qualifications)) {
+                  qualificationsArray = app.qualifications;
+                } else if (typeof app.qualifications === 'object') {
+                  // Convert object to array
+                  qualificationsArray = Object.values(app.qualifications).filter((q: any) => q && typeof q === 'object');
+                }
+              }
+              
               setFormData({
                 subjects: app.subjects || [],
                 levels: app.levels || [],
-                qualifications: app.qualifications || [],
+                qualifications: qualificationsArray,
                 experience: app.experience || "",
                 resume: app.resume || "",
                 resumeFile: app.resume ? { url: app.resume, path: "", name: "Resume" } : null,
@@ -456,7 +481,7 @@ export default function ApplyPage() {
         userId: userData.id,
         subjects: formData.subjects,
         levels: formData.levels,
-        qualifications: formData.qualifications.length > 0 
+        qualifications: (Array.isArray(formData.qualifications) && formData.qualifications.length > 0)
           ? formData.qualifications.reduce((acc, q, i) => {
               acc[i] = q;
               return acc;
@@ -472,7 +497,8 @@ export default function ApplyPage() {
 
       if (result.success) {
         toast.success("Application submitted successfully! We'll review it soon.");
-        router.push("/portal/teacher");
+        // Redirect to dashboard - it will show the pending application status
+        router.push("/portal/teacher?application=submitted");
       } else {
         toast.error("error" in result ? result.error : "Failed to submit application");
       }
@@ -496,6 +522,51 @@ export default function ApplyPage() {
     return null; // Will redirect
   }
 
+  // Check if form should be disabled (when application is pending or under review)
+  const isFormDisabled = existingApplication && (existingApplication.status === "PENDING" || existingApplication.status === "UNDER_REVIEW");
+
+  // Get professional status message
+  const getStatusMessage = (status: string) => {
+    const statusMessages: Record<string, { title: string; description: string; statusLabel: string }> = {
+      PENDING: {
+        title: "Application Submitted",
+        statusLabel: "Pending",
+        description: "Your application has been successfully submitted and is awaiting review by our team. You can expect to hear from us within 2-3 business days. We will notify you via email once the review process begins."
+      },
+      UNDER_REVIEW: {
+        title: "Under Review",
+        statusLabel: "Under Review",
+        description: "Your application is currently being reviewed by our team. This process typically takes 2-3 business days. We will notify you of the outcome via email."
+      },
+      INTERVIEW_SCHEDULED: {
+        title: "Interview Scheduled",
+        statusLabel: "Interview Scheduled",
+        description: "An interview has been scheduled for your application. Please check your email for details regarding the interview date, time, and meeting link."
+      },
+      INTERVIEW_COMPLETED: {
+        title: "Interview Completed",
+        statusLabel: "Interview Completed",
+        description: "Your interview has been completed. Our team is finalizing the review of your application. You can expect to hear from us within 2-3 business days. We will notify you of the final decision via email."
+      },
+      APPROVED: {
+        title: "Application Approved",
+        statusLabel: "Approved",
+        description: "Congratulations! Your application has been approved. You can now access your teacher dashboard and start teaching on StudyLinker."
+      },
+      REJECTED: {
+        title: "Application Not Approved",
+        statusLabel: "Rejected",
+        description: "We regret to inform you that your application was not approved at this time. If you have questions, please contact our support team."
+      }
+    };
+
+    return statusMessages[status] || {
+      title: status.replace(/_/g, " "),
+      statusLabel: status.replace(/_/g, " "),
+      description: "Your application status is being processed."
+    };
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-indigo-50 py-12">
       <Container>
@@ -509,18 +580,99 @@ export default function ApplyPage() {
             </p>
           </div>
 
-          {existingApplication && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-              <p className="text-yellow-800">
-                <strong>Status:</strong> {existingApplication.status.replace(/_/g, " ")}
-                {existingApplication.interviewScheduledAt && (
-                  <span className="block mt-1">
-                    Interview scheduled: {new Date(existingApplication.interviewScheduledAt).toLocaleString()}
-                  </span>
-                )}
-              </p>
-            </div>
-          )}
+          {existingApplication && (() => {
+            const statusInfo = getStatusMessage(existingApplication.status);
+            return (
+              <div className={`rounded-lg p-5 sm:p-6 mb-6 shadow-sm ${
+                existingApplication.status === "PENDING" || existingApplication.status === "UNDER_REVIEW"
+                  ? "bg-yellow-50 border-2 border-yellow-200"
+                  : existingApplication.status === "APPROVED"
+                  ? "bg-green-50 border-2 border-green-200"
+                  : existingApplication.status === "REJECTED"
+                  ? "bg-red-50 border-2 border-red-200"
+                  : "bg-blue-50 border-2 border-blue-200"
+              }`}>
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0">
+                    {existingApplication.status === "PENDING" || existingApplication.status === "UNDER_REVIEW" ? (
+                      <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    ) : existingApplication.status === "APPROVED" ? (
+                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    ) : existingApplication.status === "REJECTED" ? (
+                      <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="mb-2">
+                      <span className={`text-sm font-semibold uppercase tracking-wide ${
+                        existingApplication.status === "PENDING" || existingApplication.status === "UNDER_REVIEW"
+                          ? "text-yellow-700"
+                          : existingApplication.status === "APPROVED"
+                          ? "text-green-700"
+                          : existingApplication.status === "REJECTED"
+                          ? "text-red-700"
+                          : "text-blue-700"
+                      }`}>
+                        Application Status:
+                      </span>
+                      <span className={`ml-2 text-base font-bold ${
+                        existingApplication.status === "PENDING" || existingApplication.status === "UNDER_REVIEW"
+                          ? "text-yellow-800"
+                          : existingApplication.status === "APPROVED"
+                          ? "text-green-800"
+                          : existingApplication.status === "REJECTED"
+                          ? "text-red-800"
+                          : "text-blue-800"
+                      }`}>
+                        {statusInfo.statusLabel}
+                      </span>
+                    </div>
+                    <h3 className={`text-lg font-bold mb-2 ${
+                      existingApplication.status === "PENDING" || existingApplication.status === "UNDER_REVIEW"
+                        ? "text-yellow-800"
+                        : existingApplication.status === "APPROVED"
+                        ? "text-green-800"
+                        : existingApplication.status === "REJECTED"
+                        ? "text-red-800"
+                        : "text-blue-800"
+                    }`}>
+                      {statusInfo.title}
+                    </h3>
+                    <p className={`text-sm leading-relaxed ${
+                      existingApplication.status === "PENDING" || existingApplication.status === "UNDER_REVIEW"
+                        ? "text-yellow-700"
+                        : existingApplication.status === "APPROVED"
+                        ? "text-green-700"
+                        : existingApplication.status === "REJECTED"
+                        ? "text-red-700"
+                        : "text-blue-700"
+                    }`}>
+                      {statusInfo.description}
+                    </p>
+                    {existingApplication.interviewScheduledAt && (
+                      <p className={`text-sm font-medium mt-2 ${
+                        existingApplication.status === "PENDING" || existingApplication.status === "UNDER_REVIEW"
+                          ? "text-yellow-800"
+                          : "text-blue-800"
+                      }`}>
+                        Interview scheduled: {new Date(existingApplication.interviewScheduledAt).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Personal Information */}
@@ -545,7 +697,8 @@ export default function ApplyPage() {
                       }}
                       placeholder="Enter your age"
                       required
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      disabled={existingApplication && (existingApplication.status === "PENDING" || existingApplication.status === "UNDER_REVIEW")}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
                     />
                     <p className="text-xs text-gray-500 mt-1.5">Must be 18 or older</p>
                   </div>
@@ -566,7 +719,8 @@ export default function ApplyPage() {
                           <button
                             type="button"
                             onClick={handlePhotoRemove}
-                            className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-md transition-colors z-10"
+                            disabled={isFormDisabled}
+                            className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-md transition-colors z-10 disabled:opacity-50 disabled:cursor-not-allowed"
                             aria-label="Remove photo"
                           >
                             <BsX className="w-3 h-3" />
@@ -578,7 +732,7 @@ export default function ApplyPage() {
                             type="file"
                             accept="image/jpeg,image/jpg,image/png,image/webp"
                             onChange={handlePhotoUpload}
-                            disabled={uploadingPhoto}
+                            disabled={uploadingPhoto || isFormDisabled}
                             className="hidden"
                           />
                           <div className="w-20 h-20 rounded-full border-2 border-dashed border-indigo-300 bg-indigo-50 flex flex-col items-center justify-center transition-all group-hover:border-indigo-400 group-hover:bg-indigo-100">
@@ -624,7 +778,8 @@ export default function ApplyPage() {
                       type="checkbox"
                       checked={formData.subjects.includes(subject)}
                       onChange={() => handleSubjectToggle(subject)}
-                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                      disabled={isFormDisabled}
+                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                     <span className="text-sm font-medium text-gray-700">{subject}</span>
                   </label>
@@ -647,7 +802,8 @@ export default function ApplyPage() {
                       type="checkbox"
                       checked={formData.levels.includes(level)}
                       onChange={() => handleLevelToggle(level)}
-                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                      disabled={isFormDisabled}
+                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                     <span className="text-sm font-medium text-gray-700">{level}</span>
                   </label>
@@ -666,13 +822,14 @@ export default function ApplyPage() {
                   onClick={handleAddQualification}
                   variant="outline"
                   size="sm"
+                  disabled={isFormDisabled}
                 >
                   <BsAward className="w-4 h-4 mr-2" />
                   Add Qualification
                 </Button>
               </div>
               <div className="space-y-4">
-                {formData.qualifications.map((qual, index) => (
+                {(Array.isArray(formData.qualifications) ? formData.qualifications : []).map((qual, index) => (
                   <div key={index} className="grid grid-cols-1 sm:grid-cols-12 gap-3 sm:gap-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
                     <input
                       type="text"
@@ -681,7 +838,8 @@ export default function ApplyPage() {
                       onChange={(e) =>
                         handleQualificationChange(index, "title", e.target.value)
                       }
-                      className="sm:col-span-4 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+                      disabled={isFormDisabled}
+                      className="sm:col-span-4 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white disabled:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
                     />
                     <input
                       type="text"
@@ -690,7 +848,8 @@ export default function ApplyPage() {
                       onChange={(e) =>
                         handleQualificationChange(index, "institution", e.target.value)
                       }
-                      className="sm:col-span-4 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+                      disabled={isFormDisabled}
+                      className="sm:col-span-4 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white disabled:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
                     />
                     <div className="sm:col-span-4 flex gap-2">
                       <input
@@ -705,12 +864,14 @@ export default function ApplyPage() {
                             handleQualificationChange(index, "year", yearValue);
                           }
                         }}
-                        className="flex-1 min-w-0 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+                        disabled={isFormDisabled}
+                        className="flex-1 min-w-0 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white disabled:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
                       />
                       <button
                         type="button"
                         onClick={() => handleRemoveQualification(index)}
-                        className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg shrink-0"
+                        disabled={isFormDisabled}
+                        className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                         aria-label="Remove qualification"
                       >
                         <BsX className="w-5 h-5" />
@@ -718,7 +879,7 @@ export default function ApplyPage() {
                     </div>
                   </div>
                 ))}
-                {formData.qualifications.length === 0 && (
+                {(!Array.isArray(formData.qualifications) || formData.qualifications.length === 0) && (
                   <p className="text-gray-500 text-sm">No qualifications added yet</p>
                 )}
               </div>
@@ -736,7 +897,8 @@ export default function ApplyPage() {
                 }
                 placeholder="Describe your teaching experience, years of experience, notable achievements, etc."
                 rows={6}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                disabled={isFormDisabled}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
               />
             </div>
 
@@ -754,15 +916,15 @@ export default function ApplyPage() {
                   
                   {/* Upload Area */}
                   <div
-                    onDragEnter={(e) => handleDrag(e, "resume")}
-                    onDragLeave={(e) => handleDragLeave(e, "resume")}
-                    onDragOver={(e) => handleDrag(e, "resume")}
-                    onDrop={(e) => handleDrop(e, "resume")}
+                    onDragEnter={(e) => !isFormDisabled && handleDrag(e, "resume")}
+                    onDragLeave={(e) => !isFormDisabled && handleDragLeave(e, "resume")}
+                    onDragOver={(e) => !isFormDisabled && handleDrag(e, "resume")}
+                    onDrop={(e) => !isFormDisabled && handleDrop(e, "resume")}
                     className={`relative border-2 border-dashed rounded-lg p-6 transition-colors ${
                       dragActiveResume
                         ? "border-indigo-500 bg-indigo-50"
                         : "border-gray-300 bg-gray-50"
-                    }`}
+                    } ${isFormDisabled ? "opacity-60 cursor-not-allowed" : ""}`}
                   >
                     {formData.resumeFile ? (
                       <div className="flex items-center justify-between">
@@ -776,7 +938,8 @@ export default function ApplyPage() {
                         <button
                           type="button"
                           onClick={handleResumeRemove}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          disabled={isFormDisabled}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           aria-label="Remove resume"
                         >
                           <BsX className="w-5 h-5" />
@@ -792,7 +955,7 @@ export default function ApplyPage() {
                               handleResumeUpload(e.target.files[0]);
                             }
                           }}
-                          disabled={uploadingResume}
+                          disabled={uploadingResume || isFormDisabled}
                           className="hidden"
                           id="resume-upload"
                         />
@@ -839,15 +1002,15 @@ export default function ApplyPage() {
                   
                   {/* Upload Area */}
                   <div
-                    onDragEnter={(e) => handleDrag(e, "certificates")}
-                    onDragLeave={(e) => handleDragLeave(e, "certificates")}
-                    onDragOver={(e) => handleDrag(e, "certificates")}
-                    onDrop={(e) => handleDrop(e, "certificates")}
+                    onDragEnter={(e) => !isFormDisabled && handleDrag(e, "certificates")}
+                    onDragLeave={(e) => !isFormDisabled && handleDragLeave(e, "certificates")}
+                    onDragOver={(e) => !isFormDisabled && handleDrag(e, "certificates")}
+                    onDrop={(e) => !isFormDisabled && handleDrop(e, "certificates")}
                     className={`relative border-2 border-dashed rounded-lg p-6 transition-colors ${
                       dragActiveCertificates
                         ? "border-indigo-500 bg-indigo-50"
                         : "border-gray-300 bg-gray-50"
-                    }`}
+                    } ${isFormDisabled ? "opacity-60 cursor-not-allowed" : ""}`}
                   >
                     <input
                       type="file"
@@ -858,7 +1021,7 @@ export default function ApplyPage() {
                           handleCertificateUpload(e.target.files);
                         }
                       }}
-                      disabled={uploadingCertificates}
+                      disabled={uploadingCertificates || isFormDisabled}
                       className="hidden"
                       id="certificates-upload"
                     />
@@ -895,7 +1058,8 @@ export default function ApplyPage() {
                           <button
                             type="button"
                             onClick={() => handleCertificateRemove(index)}
-                            className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                            disabled={isFormDisabled}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             aria-label="Remove certificate"
                           >
                             <BsX className="w-4 h-4" />
@@ -945,7 +1109,8 @@ export default function ApplyPage() {
                 rows={8}
                 required
                 minLength={50}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                disabled={isFormDisabled}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
               />
               <p className="text-sm text-gray-500 mt-2">
                 {formData.coverLetter.length}/50 characters minimum
@@ -954,13 +1119,36 @@ export default function ApplyPage() {
 
             {/* Submit */}
             <div className="flex gap-4">
-              <Button
-                type="submit"
-                disabled={submitting}
-                className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-8 py-6 text-lg rounded-full shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {submitting ? "Submitting..." : "Submit Application"}
-              </Button>
+              {existingApplication && (existingApplication.status === "PENDING" || existingApplication.status === "UNDER_REVIEW") ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex-1">
+                      <Button
+                        type="button"
+                        disabled={true}
+                        className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-8 py-6 text-lg rounded-full shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Application Already Submitted
+                      </Button>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    <p className="text-sm">
+                      {existingApplication.status === "PENDING" 
+                        ? "Your application is pending review. We'll notify you once it's been reviewed."
+                        : "Your application is currently under review. We'll notify you of the outcome soon."}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <Button
+                  type="submit"
+                  disabled={submitting}
+                  className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-8 py-6 text-lg rounded-full shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {submitting ? "Submitting..." : "Submit Application"}
+                </Button>
+              )}
             </div>
           </form>
         </div>

@@ -23,6 +23,12 @@ export default clerkMiddleware(async (auth, req) => {
   const { pathname } = req.nextUrl;
   const { userId } = await auth();
   
+  // Skip middleware for server actions (they have their own auth)
+  const isServerAction = req.headers.get("next-action") !== null;
+  if (isServerAction) {
+    return NextResponse.next();
+  }
+  
   // Skip profile check ONLY for auth pages (to avoid redirect loops)
   if (pathname.startsWith("/sign-in") || pathname.startsWith("/sign-up")) {
     return NextResponse.next();
@@ -30,7 +36,7 @@ export default clerkMiddleware(async (auth, req) => {
   
   // Handle onboarding page
   if (pathname.startsWith("/onboarding")) {
-    // If user has profile and is on onboarding, redirect them away
+    // If user has profile with valid role, redirect them away
     if (userId) {
       try {
         const supabase = getSupabaseAdmin();
@@ -42,14 +48,18 @@ export default clerkMiddleware(async (auth, req) => {
 
         if (userProfile) {
           const profile = userProfile as { role: string; isAdmin?: boolean };
-          const isAdmin = profile.isAdmin === true;
-          if (isAdmin) {
-            return NextResponse.redirect(new URL("/admin", req.url));
-          } else if (profile.role === "PARENT") {
-            return NextResponse.redirect(new URL("/portal/parent", req.url));
-          } else if (profile.role === "TEACHER") {
-            return NextResponse.redirect(new URL("/portal/teacher", req.url));
+          // Only redirect if they have a valid role (PARENT or TEACHER)
+          if (profile.role === "PARENT" || profile.role === "TEACHER") {
+            const isAdmin = profile.isAdmin === true;
+            if (isAdmin) {
+              return NextResponse.redirect(new URL("/admin", req.url));
+            } else if (profile.role === "PARENT") {
+              return NextResponse.redirect(new URL("/portal/parent", req.url));
+            } else if (profile.role === "TEACHER") {
+              return NextResponse.redirect(new URL("/portal/teacher", req.url));
+            }
           }
+          // If profile exists but role is invalid/missing, let them stay on onboarding
         }
       } catch (error) {
         // If error checking, let them stay on onboarding
@@ -85,25 +95,40 @@ export default clerkMiddleware(async (auth, req) => {
       // For teacher routes, verify teacher status
       const profile = userProfile as { role: string };
       if (profile.role === "TEACHER") {
-        if (pathname.startsWith("/teachers/find-students") || (pathname.startsWith("/jobs/") && pathname.includes("/apply"))) {
+        // Check verification for teacher portal and protected teacher routes
+        // Skip check for application page and public teacher pages
+        if ((pathname.startsWith("/portal/teacher") || 
+            pathname.startsWith("/teachers/find-students") || 
+            (pathname.startsWith("/jobs/") && pathname.includes("/apply"))) &&
+            !pathname.startsWith("/teachers/apply") &&
+            !pathname.startsWith("/teachers/application-process") &&
+            !pathname.startsWith("/teachers/benefits") &&
+            !pathname.startsWith("/teachers/resources")) {
           try {
             const verificationResult = await checkTeacherVerification();
+            console.log("Teacher verification check:", {
+              pathname,
+              success: verificationResult.success,
+              data: verificationResult.data,
+            });
+            
             if (verificationResult.success && verificationResult.data) {
               const verification = verificationResult.data;
               
               // If not verified and no application, redirect to application page
               if (!verification.isVerified && !verification.hasApplication) {
+                console.log("Redirecting teacher to application page - not verified and no application");
                 return NextResponse.redirect(new URL("/teachers/apply", req.url));
               }
-              
-              // If not verified but has application, redirect to dashboard
-              if (!verification.isVerified && verification.hasApplication) {
-                return NextResponse.redirect(new URL("/portal/teacher", req.url));
-              }
+            } else {
+              // If verification check failed, redirect to application page to be safe
+              console.error("Teacher verification check failed, redirecting to application page");
+              return NextResponse.redirect(new URL("/teachers/apply", req.url));
             }
           } catch (error) {
             console.error("Error checking teacher verification:", error);
-            // Continue if error (don't block access)
+            // On error, redirect to application page
+            return NextResponse.redirect(new URL("/teachers/apply", req.url));
           }
         }
       }

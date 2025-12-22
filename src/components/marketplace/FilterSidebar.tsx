@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { BsChevronDown, BsChevronUp } from "react-icons/bs";
 
 interface FilterSidebarProps {
@@ -9,7 +10,33 @@ interface FilterSidebarProps {
 }
 
 export default function FilterSidebar({ type, onFilterChange }: FilterSidebarProps) {
+  const searchParams = useSearchParams();
   const [openSections, setOpenSections] = useState<string[]>([]);
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
+  const [selectedLevels, setSelectedLevels] = useState<string[]>([]);
+  const [minPrice, setMinPrice] = useState<string>("");
+  const [maxPrice, setMaxPrice] = useState<string>("");
+
+  // Initialize from URL params
+  useEffect(() => {
+    const urlSubjects = searchParams.get("subjects");
+    const urlLevels = searchParams.get("levels");
+    const urlMinPrice = searchParams.get("minPrice");
+    const urlMaxPrice = searchParams.get("maxPrice");
+
+    if (urlSubjects) {
+      setSelectedSubjects(urlSubjects.split(",").filter(Boolean));
+    }
+    if (urlLevels) {
+      setSelectedLevels(urlLevels.split(",").filter(Boolean));
+    }
+    if (urlMinPrice) {
+      setMinPrice(urlMinPrice);
+    }
+    if (urlMaxPrice) {
+      setMaxPrice(urlMaxPrice);
+    }
+  }, [searchParams]);
 
   const toggleSection = (section: string) => {
     setOpenSections((prev) =>
@@ -65,6 +92,14 @@ export default function FilterSidebar({ type, onFilterChange }: FilterSidebarPro
               >
                 <input
                   type="checkbox"
+                  checked={selectedSubjects.includes(subject)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedSubjects([...selectedSubjects, subject]);
+                    } else {
+                      setSelectedSubjects(selectedSubjects.filter(s => s !== subject));
+                    }
+                  }}
                   className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                 />
                 <span className="text-sm text-gray-700">{subject}</span>
@@ -96,6 +131,14 @@ export default function FilterSidebar({ type, onFilterChange }: FilterSidebarPro
               >
                 <input
                   type="checkbox"
+                  checked={selectedLevels.includes(level)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedLevels([...selectedLevels, level]);
+                    } else {
+                      setSelectedLevels(selectedLevels.filter(l => l !== level));
+                    }
+                  }}
                   className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                 />
                 <span className="text-sm text-gray-700">{level}</span>
@@ -158,11 +201,15 @@ export default function FilterSidebar({ type, onFilterChange }: FilterSidebarPro
               <input
                 type="number"
                 placeholder="Min"
+                value={minPrice}
+                onChange={(e) => setMinPrice(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
               />
               <input
                 type="number"
                 placeholder="Max"
+                value={maxPrice}
+                onChange={(e) => setMaxPrice(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
               />
             </div>
@@ -170,9 +217,38 @@ export default function FilterSidebar({ type, onFilterChange }: FilterSidebarPro
         )}
       </div>
 
-      <button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-semibold transition-colors">
-        Apply Filters
-      </button>
+      <div className="flex gap-2">
+        <button 
+          onClick={() => {
+            if (onFilterChange) {
+              onFilterChange({
+                subjects: selectedSubjects,
+                levels: selectedLevels,
+                minPrice: minPrice ? parseFloat(minPrice) : undefined,
+                maxPrice: maxPrice ? parseFloat(maxPrice) : undefined,
+              });
+            }
+          }}
+          className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-semibold transition-colors"
+        >
+          Apply Filters
+        </button>
+        <button 
+          onClick={() => {
+            setSelectedSubjects([]);
+            setSelectedLevels([]);
+            setMinPrice("");
+            setMaxPrice("");
+            if (onFilterChange) {
+              onFilterChange({}); // This will trigger URL update in parent
+            }
+          }}
+          className="px-4 bg-gray-200 hover:bg-gray-300 text-gray-700 py-2 rounded-lg font-semibold transition-colors"
+          title="Clear all filters"
+        >
+          Clear
+        </button>
+      </div>
     </div>
   );
 }

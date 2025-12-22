@@ -16,9 +16,8 @@ export async function POST(request: NextRequest) {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    // Use gemini-1.5-flash (faster and more reliable) or gemini-1.5-pro
-    // gemini-pro is deprecated
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const prompt = `Generate a professional and detailed job description for a tuition job posting on StudyLinker, an online tuition marketplace. 
 
@@ -52,4 +51,3 @@ Make it professional, clear, and appealing to qualified teachers. Keep it betwee
     );
   }
 }
-

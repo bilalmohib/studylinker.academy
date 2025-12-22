@@ -8,6 +8,7 @@ import Link from "next/link";
 import { BsCurrencyDollar, BsCalendar, BsFileText } from "react-icons/bs";
 import { createApplication } from "@/actions/applications/actions";
 import { getCurrentTeacherProfile } from "@/actions/teachers/actions";
+import { getCurrentUserProfile } from "@/actions/users/actions";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
@@ -26,6 +27,7 @@ export default function ApplyToJobPage({
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [teacherId, setTeacherId] = useState<string | null>(null);
+  const [checkingRole, setCheckingRole] = useState(true);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -34,9 +36,33 @@ export default function ApplyToJobPage({
     }
   }, [isLoaded, userId, router, jobId]);
 
+  // Check if user is a parent - parents cannot apply to jobs
+  useEffect(() => {
+    if (!userId || !isLoaded) return;
+
+    const checkUserRole = async () => {
+      try {
+        const result = await getCurrentUserProfile();
+        if (result.success && result.data) {
+          const profile = result.data as { role?: string };
+          if (profile.role === "PARENT") {
+            toast.error("Parents cannot apply to jobs. This feature is for teachers only.");
+            router.push(`/jobs/${jobId}`);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error("Error checking user role:", error);
+      } finally {
+        setCheckingRole(false);
+      }
+    };
+    checkUserRole();
+  }, [userId, isLoaded, router, jobId]);
+
   // Get teacher profile on mount
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || checkingRole) return;
 
     const fetchTeacherProfile = async () => {
       const result = await getCurrentTeacherProfile();
@@ -51,7 +77,7 @@ export default function ApplyToJobPage({
       }
     };
     fetchTeacherProfile();
-  }, [userId, router]);
+  }, [userId, router, checkingRole]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,6 +120,15 @@ export default function ApplyToJobPage({
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
+
+  // Show loading while checking role
+  if (checkingRole) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-indigo-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-indigo-50 py-12">

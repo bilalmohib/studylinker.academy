@@ -14,65 +14,170 @@ import {
 } from "@/lib/utils/errors";
 import { idSchema } from "@/lib/utils/validation";
 import { auth } from "@clerk/nextjs/server";
+import { randomUUID } from "crypto";
 
 /**
  * Create parent profile
  */
 export async function createParentProfile(userId: string) {
+  console.log("createParentProfile called with userId:", userId);
+  
   try {
-    const validated = idSchema.parse(userId);
-    const { userId: clerkUserId } = await auth();
+    // Validate input
+    let validated: string;
+    try {
+      validated = idSchema.parse(userId);
+      console.log("Validated userId:", validated);
+    } catch (validationError) {
+      console.error("Validation error:", validationError);
+      return {
+        success: false,
+        error: "Invalid user ID format",
+        code: "VALIDATION_ERROR"
+      };
+    }
+    
+    // Get current authenticated user
+    let clerkUserId: string | null;
+    try {
+      const authResult = await auth();
+      clerkUserId = authResult.userId;
+      console.log("Current clerkUserId:", clerkUserId);
+    } catch (authError) {
+      console.error("Auth error:", authError);
+      return {
+        success: false,
+        error: "Authentication failed",
+        code: "AUTH_ERROR"
+      };
+    }
 
     if (!clerkUserId) {
-      throw new UnauthorizedError();
+      console.error("No authenticated user");
+      return { 
+        success: false, 
+        error: "You must be signed in to create a profile",
+        code: "UNAUTHORIZED" 
+      };
     }
 
     const supabase = getSupabaseAdmin();
 
     // Verify user exists and matches
-    const { data: user } = await (supabase
+    const { data: user, error: userError } = await (supabase
       .from("UserProfile")
       .select("id, clerkId")
       .eq("id", validated)
-      .single() as unknown as Promise<{ data: { id: string; clerkId: string } | null; error: any }>);
+      .maybeSingle() as unknown as Promise<{ data: { id: string; clerkId: string } | null; error: any }>);
 
-    if (!user || user.clerkId !== clerkUserId) {
-      throw new UnauthorizedError();
+    if (userError) {
+      console.error("Error fetching user:", userError);
+      return { 
+        success: false, 
+        error: "Failed to verify user profile",
+        code: "DATABASE_ERROR" 
+      };
+    }
+
+    if (!user) {
+      console.error("User not found:", validated);
+      return { 
+        success: false, 
+        error: "User profile not found",
+        code: "NOT_FOUND" 
+      };
+    }
+
+    if (user.clerkId !== clerkUserId) {
+      console.error("ClerkId mismatch:", { userId: validated, clerkUserId, userClerkId: user.clerkId });
+      return { 
+        success: false, 
+        error: "Unauthorized access",
+        code: "UNAUTHORIZED" 
+      };
     }
 
     // Check if parent profile already exists
-    const { data: existing } = await (supabase
+    const { data: existing, error: checkError } = await (supabase
       .from("ParentProfile")
       .select("id")
       .eq("userId", validated)
-      .single() as unknown as Promise<{ data: { id: string } | null; error: any }>);
+      .maybeSingle() as unknown as Promise<{ data: { id: string } | null; error: any }>);
 
-    if (existing) {
-      return { success: true, data: existing };
+    if (checkError && checkError.code !== "PGRST116") {
+      console.error("Error checking existing parent profile:", checkError);
+      return { 
+        success: false, 
+        error: "Failed to check existing profile",
+        code: "DATABASE_ERROR" 
+      };
     }
 
-    // Generate UUID using Node.js crypto
-    const crypto = await import("crypto");
-    const parentId = crypto.randomUUID();
+    // If profile exists, return it
+    if (existing) {
+      console.log("Parent profile already exists:", existing.id);
+      return { 
+        success: true, 
+        data: {
+          id: existing.id,
+          userId: validated
+        }
+      };
+    }
 
-    const insertData: any = {
+    // Generate UUID
+    const parentId = randomUUID();
+    console.log("Creating new parent profile with id:", parentId);
+
+    const insertData = {
       id: parentId,
       userId: validated,
     };
 
-    const { data: parent, error } = await (supabase
+    const { data: parent, error: insertError } = await (supabase
       .from("ParentProfile")
       .insert(insertData)
       .select()
-      .single() as unknown as Promise<{ data: any; error: any }>);
+      .maybeSingle() as unknown as Promise<{ data: any; error: any }>);
 
-    if (error) {
-      throw new ValidationError(error.message);
+    if (insertError) {
+      console.error("Error inserting parent profile:", insertError);
+      return { 
+        success: false, 
+        error: insertError.message || "Failed to create parent profile",
+        code: "DATABASE_ERROR" 
+      };
     }
 
-    return { success: true, data: parent };
+    if (!parent) {
+      console.error("Parent profile creation returned no data");
+      return { 
+        success: false, 
+        error: "Failed to create parent profile",
+        code: "DATABASE_ERROR" 
+      };
+    }
+
+    console.log("Parent profile created successfully:", parent.id);
+    // Return only plain serializable data
+    return { 
+      success: true, 
+      data: {
+        id: parent.id,
+        userId: parent.userId
+      }
+    };
   } catch (error) {
-    return { success: false, ...handleError(error) };
+    console.error("Unexpected error in createParentProfile:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error || "An unexpected error occurred");
+    // Ensure the return value is 100% serializable
+    const result = { 
+      success: false as const,
+      error: String(errorMessage),
+      code: "UNKNOWN_ERROR" as const
+    };
+    console.log("Returning error result:", JSON.stringify(result));
+    return result;
   }
 }
 

@@ -10,9 +10,10 @@ import {
   BsPencil,
   BsCheckCircle,
   BsXCircle,
+  BsTrash,
 } from "react-icons/bs";
 import toast from "react-hot-toast";
-import { getAllUsers, updateUserProfileAdmin } from "@/actions/users/actions";
+import { getAllUsers, updateUserProfileAdmin, deleteUserProfileAdmin } from "@/actions/users/actions";
 import { useRealtime } from "@/hooks/useRealtime";
 import Image from "next/image";
 
@@ -26,6 +27,9 @@ interface User {
   role: "PARENT" | "TEACHER";
   isAdmin: boolean;
   createdAt: string;
+  TeacherProfile?: {
+    verified: boolean;
+  } | null;
 }
 
 export default function AdminUsersPage() {
@@ -42,6 +46,8 @@ export default function AdminUsersPage() {
     totalPages: 0,
   });
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [deletingUser, setDeletingUser] = useState<User | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [editForm, setEditForm] = useState({
     firstName: "",
     lastName: "",
@@ -59,6 +65,9 @@ export default function AdminUsersPage() {
       setUsers((prev) =>
         prev.map((user) => (user.id === updatedUser.id ? updatedUser : user))
       );
+    },
+    onDelete: (deletedUser: User) => {
+      setUsers((prev) => prev.filter((user) => user.id !== deletedUser.id));
     },
     enabled: true,
   });
@@ -126,6 +135,29 @@ export default function AdminUsersPage() {
     } catch (error) {
       console.error("Error updating user:", error);
       toast.error("An error occurred while updating user");
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deletingUser) return;
+
+    setIsDeleting(true);
+    try {
+      const result = await deleteUserProfileAdmin(deletingUser.id);
+
+      if (result.success) {
+        toast.success("User deleted successfully");
+        setDeletingUser(null);
+        fetchUsers();
+      } else {
+        const errorMessage = "error" in result ? result.error : "Failed to delete user";
+        toast.error(errorMessage);
+      }
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      toast.error("An error occurred while deleting user");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -225,6 +257,9 @@ export default function AdminUsersPage() {
                       Admin
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Verified
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Created
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -281,17 +316,39 @@ export default function AdminUsersPage() {
                           <span className="text-gray-400">—</span>
                         )}
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {user.role === "TEACHER" ? (
+                          user.TeacherProfile?.verified ? (
+                            <BsCheckCircle className="w-5 h-5 text-green-600" title="Verified Teacher" />
+                          ) : (
+                            <BsXCircle className="w-5 h-5 text-gray-400" title="Not Verified" />
+                          )
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {new Date(user.createdAt).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(user)}
-                        >
-                          <BsPencil className="w-4 h-4" />
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleEdit(user)}
+                            title="Edit User"
+                            className="p-2 rounded-md hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors"
+                          >
+                            <BsPencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeletingUser(user)}
+                            title="Delete User"
+                            className="p-2 rounded-md text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors"
+                          >
+                            <BsTrash className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -411,6 +468,43 @@ export default function AdminUsersPage() {
                   className="flex-1"
                 >
                   Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {deletingUser && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">
+                Delete User
+              </h2>
+              <p className="text-gray-600 mb-6">
+                Are you sure you want to delete{" "}
+                <span className="font-semibold">
+                  {deletingUser.firstName && deletingUser.lastName
+                    ? `${deletingUser.firstName} ${deletingUser.lastName}`
+                    : deletingUser.email}
+                </span>
+                ? This action cannot be undone.
+              </p>
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => setDeletingUser(null)}
+                  className="flex-1"
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleDelete}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? "Deleting..." : "Delete User"}
                 </Button>
               </div>
             </div>

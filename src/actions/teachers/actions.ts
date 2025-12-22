@@ -15,6 +15,7 @@ import {
 import { idSchema, paginationSchema } from "@/lib/utils/validation";
 import { z } from "zod";
 import { auth } from "@clerk/nextjs/server";
+import { randomUUID } from "crypto";
 
 const createTeacherProfileSchema = z.object({
   userId: idSchema,
@@ -54,31 +55,114 @@ const searchTeachersSchema = z.object({
 export async function createTeacherProfile(
   data: z.infer<typeof createTeacherProfileSchema>
 ) {
+  console.log("createTeacherProfile called with data:", data);
+  
   try {
-    const validated = createTeacherProfileSchema.parse(data);
-    const { userId } = await auth();
+    // Validate input
+    let validated: z.infer<typeof createTeacherProfileSchema>;
+    try {
+      validated = createTeacherProfileSchema.parse(data);
+    } catch (validationError) {
+      console.error("Validation error:", validationError);
+      return {
+        success: false,
+        error: "Invalid teacher profile data",
+        code: "VALIDATION_ERROR"
+      };
+    }
+    
+    // Get current authenticated user
+    let userId: string | null;
+    try {
+      const authResult = await auth();
+      userId = authResult.userId;
+      console.log("Current clerkUserId:", userId);
+    } catch (authError) {
+      console.error("Auth error:", authError);
+      return {
+        success: false,
+        error: "Authentication failed",
+        code: "AUTH_ERROR"
+      };
+    }
 
     if (!userId) {
-      throw new UnauthorizedError();
+      console.error("No authenticated user");
+      return { 
+        success: false, 
+        error: "You must be signed in to create a profile",
+        code: "UNAUTHORIZED" 
+      };
     }
 
     // Verify user exists and is a teacher
     const supabase = getSupabaseAdmin();
-    const { data: user } = await (supabase
+    const { data: user, error: userError } = await (supabase
       .from("UserProfile")
       .select("id, role")
       .eq("clerkId", userId)
-      .single() as unknown as Promise<{ data: { id: string; role: string } | null; error: any }>);
+      .maybeSingle() as unknown as Promise<{ data: { id: string; role: string } | null; error: any }>);
 
-    if (!user || user.id !== validated.userId) {
-      throw new UnauthorizedError();
+    if (userError) {
+      console.error("Error fetching user:", userError);
+      return { 
+        success: false, 
+        error: "Failed to verify user profile",
+        code: "DATABASE_ERROR" 
+      };
     }
 
-    // Generate UUID using Node.js crypto
-    const crypto = await import("crypto");
-    const teacherId = crypto.randomUUID();
+    if (!user) {
+      console.error("User not found for clerkId:", userId);
+      return { 
+        success: false, 
+        error: "User profile not found",
+        code: "NOT_FOUND" 
+      };
+    }
 
-    const insertData: any = {
+    if (user.id !== validated.userId) {
+      console.error("User ID mismatch:", { requestedUserId: validated.userId, actualUserId: user.id });
+      return { 
+        success: false, 
+        error: "Unauthorized access",
+        code: "UNAUTHORIZED" 
+      };
+    }
+
+    // Check if teacher profile already exists
+    const { data: existing, error: checkError } = await (supabase
+      .from("TeacherProfile")
+      .select("id")
+      .eq("userId", validated.userId)
+      .maybeSingle() as unknown as Promise<{ data: { id: string } | null; error: any }>);
+
+    if (checkError && checkError.code !== "PGRST116") {
+      console.error("Error checking existing teacher profile:", checkError);
+      return { 
+        success: false, 
+        error: "Failed to check existing profile",
+        code: "DATABASE_ERROR" 
+      };
+    }
+
+    if (existing) {
+      console.log("Teacher profile already exists:", existing.id);
+      return { 
+        success: true, 
+        data: {
+          id: existing.id,
+          userId: validated.userId,
+          verified: false
+        }
+      };
+    }
+
+    // Generate UUID
+    const teacherId = randomUUID();
+    console.log("Creating new teacher profile with id:", teacherId);
+
+    const insertData = {
       id: teacherId,
       userId: validated.userId,
       bio: validated.bio || null,
@@ -94,19 +178,51 @@ export async function createTeacherProfile(
       verified: false,
     };
 
-    const { data: teacher, error } = await (supabase
+    const { data: teacher, error: insertError } = await (supabase
       .from("TeacherProfile")
       .insert(insertData)
       .select()
-      .single() as unknown as Promise<{ data: any; error: any }>);
+      .maybeSingle() as unknown as Promise<{ data: any; error: any }>);
 
-    if (error) {
-      throw new ValidationError(error.message);
+    if (insertError) {
+      console.error("Error inserting teacher profile:", insertError);
+      return { 
+        success: false, 
+        error: insertError.message || "Failed to create teacher profile",
+        code: "DATABASE_ERROR" 
+      };
     }
 
-    return { success: true, data: teacher };
+    if (!teacher) {
+      console.error("Teacher profile creation returned no data");
+      return { 
+        success: false, 
+        error: "Failed to create teacher profile",
+        code: "DATABASE_ERROR" 
+      };
+    }
+
+    console.log("Teacher profile created successfully:", teacher.id);
+    // Return only plain serializable data
+    return { 
+      success: true, 
+      data: {
+        id: teacher.id,
+        userId: teacher.userId,
+        verified: teacher.verified || false
+      }
+    };
   } catch (error) {
-    return { success: false, ...handleError(error) };
+    console.error("Unexpected error in createTeacherProfile:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error || "An unexpected error occurred");
+    // Ensure the return value is 100% serializable
+    const result = { 
+      success: false as const,
+      error: String(errorMessage),
+      code: "UNKNOWN_ERROR" as const
+    };
+    console.log("Returning error result:", JSON.stringify(result));
+    return result;
   }
 }
 

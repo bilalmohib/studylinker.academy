@@ -89,7 +89,7 @@ export default function TeacherDashboardPage() {
         setVerificationStatus({
           isVerified: verification.isVerified,
           hasApplication: verification.hasApplication,
-          applicationStatus: verification.applicationStatus,
+          applicationStatus: verification.applicationStatus || "PENDING", // Default to PENDING if status is null
         });
 
         // If not verified and no application, redirect to application page
@@ -318,7 +318,7 @@ export default function TeacherDashboardPage() {
                   Application Under Review
                 </h3>
                 <p className="text-sm sm:text-base text-gray-700 mb-4 break-words">
-                  {verificationStatus.applicationStatus === "PENDING" && 
+                  {(verificationStatus.applicationStatus === "PENDING" || !verificationStatus.applicationStatus) && 
                     "Your teacher application has been submitted and is pending review. We'll notify you once it's been reviewed."}
                   {verificationStatus.applicationStatus === "UNDER_REVIEW" && 
                     "Your teacher application is currently under review by our team. We'll notify you of the outcome soon."}
@@ -328,8 +328,6 @@ export default function TeacherDashboardPage() {
                     "Your interview has been completed. We're finalizing the review of your application."}
                   {verificationStatus.applicationStatus === "REJECTED" && 
                     "Your application was not approved. Please contact support if you have questions."}
-                  {!verificationStatus.applicationStatus && 
-                    "Your teacher application is being processed. We'll notify you once it's been reviewed."}
                 </p>
                 <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                   <Button

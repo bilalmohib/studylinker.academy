@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import Container from "@/components/common/Container";
 import { BsPeople, BsPersonCheck } from "react-icons/bs";
 import toast from "react-hot-toast";
-import { getCurrentUserProfile } from "@/actions/users/actions";
+import { getCurrentUserProfile, updateUserProfile } from "@/actions/users/actions";
 import { createUserProfile } from "@/actions/users/actions";
 import { createParentProfile } from "@/actions/parents/actions";
 import { createTeacherProfile } from "@/actions/teachers/actions";
@@ -37,21 +37,53 @@ export default function OnboardingPage() {
         
         // Check if result is successful and has data
         if (result.success && "data" in result && result.data) {
-          // User already has a profile, redirect to appropriate portal
-          const profile = result.data as { role: string; isAdmin?: boolean };
-          if (profile.isAdmin === true) {
-            router.push("/admin");
-            return;
-          } else if (profile.role === "PARENT") {
-            router.push("/portal/parent");
-            return;
-          } else if (profile.role === "TEACHER") {
-            router.push("/portal/teacher");
-            return;
-          } else {
-            router.push("/");
-            return;
+          // User already has a profile, check if role is valid
+          const profile = result.data as { role: string; isAdmin?: boolean; firstName?: string | null; lastName?: string | null };
+          
+          // If user has a valid role, redirect to appropriate portal
+          if (profile.role === "PARENT" || profile.role === "TEACHER") {
+            if (profile.isAdmin === true) {
+              router.push("/admin");
+              return;
+            } else if (profile.role === "PARENT") {
+              router.push("/portal/parent");
+              return;
+            } else if (profile.role === "TEACHER") {
+              // Check teacher verification before redirecting
+              try {
+                const { checkTeacherVerification } = await import("@/actions/teachers/verification");
+                const verificationResult = await checkTeacherVerification();
+                
+                if (verificationResult.success && verificationResult.data) {
+                  const verification = verificationResult.data;
+                  
+                  // If not verified and no application, redirect to application page
+                  if (!verification.isVerified && !verification.hasApplication) {
+                    router.push("/teachers/apply");
+                    return;
+                  }
+                }
+                
+                // Otherwise, redirect to teacher portal (will be checked again in middleware)
+                router.push("/portal/teacher");
+                return;
+              } catch (error) {
+                console.error("Error checking teacher verification:", error);
+                // On error, still redirect to portal (middleware will handle it)
+                router.push("/portal/teacher");
+                return;
+              }
+            }
           }
+          
+          // User has profile but no valid role (or role is missing/null)
+          // Show onboarding to complete their profile
+          setChecking(false);
+          setFirstName(profile.firstName || user?.firstName || "");
+          setLastName(profile.lastName || user?.lastName || "");
+          // If they already have a role set (but invalid), don't pre-select it
+          // Let them choose again
+          return;
         }
         
         // No profile exists (result.data is null or undefined)
@@ -68,8 +100,14 @@ export default function OnboardingPage() {
         setLastName(user.lastName || "");
       } catch (error) {
         console.error("Error checking profile:", error);
-        // On error, redirect to signup to ensure proper signup flow
-        router.push("/sign-up");
+        // On error, show onboarding to be safe
+        if (user) {
+          setChecking(false);
+          setFirstName(user.firstName || "");
+          setLastName(user.lastName || "");
+        } else {
+          router.push("/sign-up");
+        }
         return;
       }
     };
@@ -104,48 +142,166 @@ export default function OnboardingPage() {
         return;
       }
 
-      // Create user profile
-      const userProfileResult = await createUserProfile({
-        clerkId: userId,
-        email: email,
-        firstName: firstName.trim() || user.firstName || null,
-        lastName: lastName.trim() || user.lastName || null,
-        role: role,
-        avatar: user.imageUrl && user.imageUrl.trim() !== "" ? user.imageUrl : null,
-      });
+      // Check if user profile already exists (might have incomplete profile)
+      const existingProfile = await getCurrentUserProfile();
+      let userProfileId: string;
 
-      if (!userProfileResult.success || !("data" in userProfileResult)) {
-        const errorMessage = "error" in userProfileResult 
-          ? userProfileResult.error 
-          : "Failed to create user profile";
-        console.error("Profile creation error:", userProfileResult);
-        toast.error(errorMessage);
-        setIsSubmitting(false);
-        return;
+      if (existingProfile.success && "data" in existingProfile && existingProfile.data) {
+        // Profile exists, update it with the role
+        const existingData = existingProfile.data as { id: string; role?: string; clerkId?: string };
+        userProfileId = existingData.id;
+        
+        // Verify this profile belongs to the current user
+        if (existingData.clerkId && existingData.clerkId !== userId) {
+          console.error("Profile ownership mismatch:", { existingClerkId: existingData.clerkId, currentUserId: userId });
+          toast.error("Profile ownership error. Please contact support.");
+          setIsSubmitting(false);
+          return;
+        }
+        
+        // Only update if role is missing or invalid
+        if (!existingData.role || (existingData.role !== "PARENT" && existingData.role !== "TEACHER")) {
+          try {
+            // Update the profile with role and name
+            const updateResult = await updateUserProfile({
+              id: userProfileId,
+              firstName: firstName.trim() || user.firstName || null,
+              lastName: lastName.trim() || user.lastName || null,
+              role: role,
+            });
+
+            if (!updateResult.success) {
+              const errorMsg = "error" in updateResult ? updateResult.error : "Failed to update user profile";
+              console.error("Profile update error:", updateResult);
+              toast.error(errorMsg || "Failed to update user profile. Please try refreshing the page.");
+              setIsSubmitting(false);
+              return;
+            }
+          } catch (updateError) {
+            console.error("Exception during profile update:", updateError);
+            toast.error(updateError instanceof Error ? updateError.message : "An error occurred while updating your profile. Please try again.");
+            setIsSubmitting(false);
+            return;
+          }
+        } else {
+          // Role already set, use existing profile
+          // Still update name if needed
+          if (firstName.trim() || lastName.trim()) {
+            try {
+              const updateResult = await updateUserProfile({
+                id: userProfileId,
+                firstName: firstName.trim() || user.firstName || null,
+                lastName: lastName.trim() || user.lastName || null,
+              });
+              if (!updateResult.success) {
+                console.warn("Failed to update name, but continuing with profile creation");
+              }
+            } catch (error) {
+              console.warn("Error updating name:", error);
+              // Continue anyway
+            }
+          }
+        }
+      } else {
+        // Create new user profile
+        const userProfileResult = await createUserProfile({
+          clerkId: userId,
+          email: email,
+          firstName: firstName.trim() || user.firstName || null,
+          lastName: lastName.trim() || user.lastName || null,
+          role: role,
+          avatar: user.imageUrl && user.imageUrl.trim() !== "" ? user.imageUrl : null,
+        });
+
+        if (!userProfileResult.success || !("data" in userProfileResult)) {
+          const errorMessage = "error" in userProfileResult 
+            ? userProfileResult.error 
+            : "Failed to create user profile";
+          console.error("Profile creation error:", userProfileResult);
+          toast.error(errorMessage);
+          setIsSubmitting(false);
+          return;
+        }
+
+        userProfileId = (userProfileResult as { success: true; data: { id: string } }).data.id;
       }
 
-      const userProfileId = (userProfileResult as { success: true; data: { id: string } }).data.id;
-
-      // Create role-specific profile
+      // Check if role-specific profile exists, create if missing
       if (role === "PARENT") {
-        const parentResult = await createParentProfile(userProfileId);
-        if (!parentResult.success) {
-          toast.error("Failed to create parent profile");
+        try {
+          console.log("Onboarding: About to create parent profile for userProfileId:", userProfileId);
+          
+          // Try to create parent profile - it will return existing if already present
+          const parentResult = await createParentProfile(userProfileId);
+          console.log("Onboarding: Parent profile result:", JSON.stringify(parentResult));
+          
+          if (!parentResult) {
+            console.error("Onboarding: parentResult is null or undefined");
+            toast.error("Failed to create parent profile - no response from server");
+            setIsSubmitting(false);
+            return;
+          }
+          
+          if (!parentResult.success) {
+            const errorMsg = "error" in parentResult ? parentResult.error : "Failed to create parent profile";
+            console.error("Onboarding: Parent profile creation failed:", JSON.stringify(parentResult));
+            toast.error(errorMsg || "Failed to create parent profile");
+            setIsSubmitting(false);
+            return;
+          }
+          
+          console.log("Onboarding: Parent profile created, redirecting to /portal/parent");
+          toast.success("Profile created successfully!");
+          router.push("/portal/parent");
+        } catch (parentError) {
+          console.error("Onboarding: Exception in parent profile creation:", parentError);
+          console.error("Onboarding: Error details:", {
+            message: parentError instanceof Error ? parentError.message : String(parentError),
+            stack: parentError instanceof Error ? parentError.stack : undefined
+          });
+          toast.error("An error occurred while creating your profile. Please try again.");
+          setIsSubmitting(false);
           return;
         }
-        toast.success("Profile created successfully!");
-        router.push("/portal/parent");
       } else if (role === "TEACHER") {
-        const teacherResult = await createTeacherProfile({
-          userId: userProfileId,
-          currency: "USD",
-        });
-        if (!teacherResult.success) {
-          toast.error("Failed to create teacher profile");
+        try {
+          console.log("Onboarding: About to create teacher profile for userProfileId:", userProfileId);
+          
+          // Try to create teacher profile - it will return existing if already present
+          const teacherResult = await createTeacherProfile({
+            userId: userProfileId,
+            currency: "USD",
+          });
+          console.log("Onboarding: Teacher profile result:", JSON.stringify(teacherResult));
+          
+          if (!teacherResult) {
+            console.error("Onboarding: teacherResult is null or undefined");
+            toast.error("Failed to create teacher profile - no response from server");
+            setIsSubmitting(false);
+            return;
+          }
+          
+          if (!teacherResult.success) {
+            const errorMsg = "error" in teacherResult ? teacherResult.error : "Failed to create teacher profile";
+            console.error("Onboarding: Teacher profile creation failed:", JSON.stringify(teacherResult));
+            toast.error(errorMsg || "Failed to create teacher profile");
+            setIsSubmitting(false);
+            return;
+          }
+          
+          console.log("Onboarding: Teacher profile created, redirecting to /portal/teacher");
+          toast.success("Profile created successfully!");
+          router.push("/portal/teacher");
+        } catch (teacherError) {
+          console.error("Onboarding: Exception in teacher profile creation:", teacherError);
+          console.error("Onboarding: Error details:", {
+            message: teacherError instanceof Error ? teacherError.message : String(teacherError),
+            stack: teacherError instanceof Error ? teacherError.stack : undefined
+          });
+          toast.error("An error occurred while creating your profile. Please try again.");
+          setIsSubmitting(false);
           return;
         }
-        toast.success("Profile created successfully!");
-        router.push("/portal/teacher");
       }
     } catch (error) {
       console.error("Error creating profile:", error);

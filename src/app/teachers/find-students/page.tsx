@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Container from "@/components/common/Container";
 import { BsSearch } from "react-icons/bs";
 import JobCard from "@/components/marketplace/JobCard";
@@ -10,6 +10,7 @@ import FilterSidebar from "@/components/marketplace/FilterSidebar";
 import { searchJobPostings } from "@/actions/jobs/actions";
 import { getApplicationsByJob } from "@/actions/applications/actions";
 import { checkTeacherVerification } from "@/actions/teachers/verification";
+import { getCurrentUserProfile } from "@/actions/users/actions";
 import toast from "react-hot-toast";
 
 interface Job {
@@ -26,14 +27,70 @@ interface Job {
   curriculum: boolean;
 }
 
+const subjects = [
+  "Mathematics",
+  "English",
+  "Science",
+  "Physics",
+  "Chemistry",
+  "Biology",
+  "History",
+  "Geography",
+  "Economics",
+];
+
 export default function FindStudentsPage() {
   const { userId, isLoaded } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState("");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [verificationChecked, setVerificationChecked] = useState(false);
+  const [filters, setFilters] = useState<{
+    subjects?: string[];
+    levels?: string[];
+    minPrice?: number;
+    maxPrice?: number;
+  }>({});
+
+  // Initialize filters from URL on mount
+  useEffect(() => {
+    const urlSubjects = searchParams.get("subjects");
+    const urlLevels = searchParams.get("levels");
+    const urlMinPrice = searchParams.get("minPrice");
+    const urlMaxPrice = searchParams.get("maxPrice");
+    const urlPage = searchParams.get("page");
+
+    const initialFilters: {
+      subjects?: string[];
+      levels?: string[];
+      minPrice?: number;
+      maxPrice?: number;
+    } = {};
+
+    if (urlSubjects) {
+      initialFilters.subjects = urlSubjects.split(",").filter(Boolean);
+    }
+    if (urlLevels) {
+      initialFilters.levels = urlLevels.split(",").filter(Boolean);
+    }
+    if (urlMinPrice) {
+      initialFilters.minPrice = parseFloat(urlMinPrice);
+    }
+    if (urlMaxPrice) {
+      initialFilters.maxPrice = parseFloat(urlMaxPrice);
+    }
+    if (urlPage) {
+      setPage(parseInt(urlPage, 10));
+    }
+
+    if (Object.keys(initialFilters).length > 0) {
+      setFilters(initialFilters);
+    }
+  }, [searchParams]);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -42,56 +99,130 @@ export default function FindStudentsPage() {
     }
   }, [isLoaded, userId, router]);
 
-  // Fetch jobs
+  // Check teacher verification - only redirect teachers who aren't verified
+  // Parents can browse jobs but won't be able to apply (handled on job detail page)
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !isLoaded) return;
 
-    const fetchJobs = async () => {
-      setLoading(true);
+    const checkVerification = async () => {
       try {
-        // Check teacher verification first
-        const verificationResult = await checkTeacherVerification();
-        if (!verificationResult.success || !verificationResult.data) {
-          toast.error("Unable to verify teacher status");
-          setLoading(false);
-          return;
-        }
-
-        const verification = verificationResult.data;
-
-        // If not verified, redirect based on application status
-        if (!verification.isVerified) {
-          if (!verification.hasApplication) {
-            toast.error("Please submit your teacher application first");
-            router.push("/teachers/apply");
-            setLoading(false);
-            return;
-          } else {
-            // Has application but not verified
-            const statusMessages: Record<string, string> = {
-              PENDING: "Your application is pending review. You'll be able to browse jobs once approved.",
-              UNDER_REVIEW: "Your application is under review. You'll be able to browse jobs once approved.",
-              INTERVIEW_SCHEDULED: "An interview has been scheduled. You'll be able to browse jobs once approved.",
-              INTERVIEW_COMPLETED: "Your interview is complete. You'll be able to browse jobs once approved.",
-              REJECTED: "Your application was not approved. Please contact support.",
-            };
-            const message = statusMessages[verification.applicationStatus || ""] || 
-              "Your application is being processed. You'll be able to browse jobs once approved.";
-            toast.error(message);
-            router.push("/portal/teacher");
-            setLoading(false);
+        const userResult = await getCurrentUserProfile();
+        if (userResult.success && userResult.data) {
+          const profile = userResult.data as { role?: string };
+          
+          // If user is a parent, allow them to browse (like Upwork - clients can see jobs)
+          if (profile.role === "PARENT") {
+            setVerificationChecked(true);
             return;
           }
         }
 
-        // Teacher is verified, proceed to fetch jobs
-        const result = await searchJobPostings({
-          status: "OPEN",
+        // For teachers, check verification status
+        const verificationResult = await checkTeacherVerification();
+        console.log("Find Students - Verification check:", verificationResult);
+        
+        if (verificationResult.success && verificationResult.data) {
+          const verification = verificationResult.data;
+          
+          // If not verified and no application, redirect to application page
+          if (!verification.isVerified && !verification.hasApplication) {
+            console.log("Redirecting: Not verified and no application");
+            toast.error("Please submit your teacher application first");
+            router.push("/teachers/apply");
+            return;
+          }
+          
+          // If verified or has application, allow access
+          setVerificationChecked(true);
+        } else {
+          // If verification check failed, redirect to application page
+          console.log("Redirecting: Verification check failed");
+          toast.error("Unable to verify teacher status. Please submit your application.");
+          router.push("/teachers/apply");
+          return;
+        }
+      } catch (error) {
+        console.error("Error checking teacher verification:", error);
+        // Allow access if error (parents can browse, teachers will be blocked at apply stage)
+        setVerificationChecked(true);
+      }
+    };
+
+    checkVerification();
+  }, [userId, isLoaded, router]);
+
+  // Fetch jobs - only after verification is checked
+  useEffect(() => {
+    if (!userId || !verificationChecked) return;
+
+    const fetchJobs = async () => {
+      setLoading(true);
+      try {
+        // Check if user is a parent - parents can browse without verification
+        const userResult = await getCurrentUserProfile();
+        const isParent = userResult.success && userResult.data && 
+          (userResult.data as { role?: string }).role === "PARENT";
+
+        // Only check teacher verification if user is NOT a parent
+        if (!isParent) {
+          const verificationResult = await checkTeacherVerification();
+          if (!verificationResult.success || !verificationResult.data) {
+            toast.error("Unable to verify teacher status");
+            setLoading(false);
+            return;
+          }
+
+          const verification = verificationResult.data;
+
+          // If not verified, redirect based on application status
+          if (!verification.isVerified) {
+            if (!verification.hasApplication) {
+              toast.error("Please submit your teacher application first");
+              router.push("/teachers/apply");
+              setLoading(false);
+              return;
+            } else {
+              // Has application but not verified
+              const statusMessages: Record<string, string> = {
+                PENDING: "Your application is pending review. You'll be able to browse jobs once approved.",
+                UNDER_REVIEW: "Your application is under review. You'll be able to browse jobs once approved.",
+                INTERVIEW_SCHEDULED: "An interview has been scheduled. You'll be able to browse jobs once approved.",
+                INTERVIEW_COMPLETED: "Your interview is complete. You'll be able to browse jobs once approved.",
+                REJECTED: "Your application was not approved. Please contact support.",
+              };
+              const message = statusMessages[verification.applicationStatus || ""] || 
+                "Your application is being processed. You'll be able to browse jobs once approved.";
+              toast.error(message);
+              router.push("/portal/teacher");
+              setLoading(false);
+              return;
+            }
+          }
+        }
+        
+        // Fetch jobs (for both parents and verified teachers)
+        const searchFilters: any = {
+          status: "OPEN", // Status must be uppercase to match database
           page,
           limit: 20,
-        });
+        };
 
+        // Apply subject filter (use first selected subject if multiple)
+        if (filters.subjects && filters.subjects.length > 0) {
+          searchFilters.subject = filters.subjects[0]; // API currently supports single subject
+        }
+
+        // Apply level filter (use first selected level if multiple)
+        if (filters.levels && filters.levels.length > 0) {
+          searchFilters.level = filters.levels[0]; // API currently supports single level
+        }
+
+        console.log("Fetching jobs with filters:", searchFilters);
+        const result = await searchJobPostings(searchFilters);
+
+        console.log("Search result:", result);
         if (result.success && result.data) {
+          console.log("Jobs found:", result.data.length);
           const transformedJobs = await Promise.all(
             result.data.map(async (job: any) => {
               // Calculate posted date
@@ -145,7 +276,16 @@ export default function FindStudentsPage() {
     };
 
     fetchJobs();
-  }, [userId, page]);
+  }, [userId, page, verificationChecked, filters]);
+
+  // Show loading if verification hasn't been checked yet
+  if (userId && !verificationChecked) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-indigo-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-indigo-50 py-12">
@@ -170,6 +310,18 @@ export default function FindStudentsPage() {
                   placeholder="Search by subject, level, or keywords..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      // For now, search by subject if query matches a subject
+                      const matchingSubject = subjects.find(s => 
+                        s.toLowerCase().includes(searchQuery.toLowerCase())
+                      );
+                      if (matchingSubject) {
+                        setFilters({ ...filters, subjects: [matchingSubject] });
+                        setPage(1);
+                      }
+                    }
+                  }}
                   className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
               </div>
@@ -180,7 +332,32 @@ export default function FindStudentsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Filters Sidebar */}
           <div className="lg:col-span-1 order-2 lg:order-1">
-            <FilterSidebar type="jobs" />
+            <FilterSidebar 
+              type="jobs" 
+              onFilterChange={(newFilters) => {
+                setFilters(newFilters);
+                setPage(1); // Reset to first page when filters change
+                
+                // Update URL with new filters
+                const params = new URLSearchParams();
+                if (newFilters.subjects && newFilters.subjects.length > 0) {
+                  params.set("subjects", newFilters.subjects.join(","));
+                }
+                if (newFilters.levels && newFilters.levels.length > 0) {
+                  params.set("levels", newFilters.levels.join(","));
+                }
+                if (newFilters.minPrice !== undefined && newFilters.minPrice !== null) {
+                  params.set("minPrice", newFilters.minPrice.toString());
+                }
+                if (newFilters.maxPrice !== undefined && newFilters.maxPrice !== null) {
+                  params.set("maxPrice", newFilters.maxPrice.toString());
+                }
+                
+                // Update URL without page reload
+                const newUrl = params.toString() ? `/teachers/find-students?${params.toString()}` : "/teachers/find-students";
+                router.push(newUrl, { scroll: false });
+              }}
+            />
           </div>
 
           {/* Jobs Grid */}
@@ -221,7 +398,14 @@ export default function FindStudentsPage() {
                 {totalPages > 1 && (
                   <div className="flex items-center justify-center gap-2 mt-8 flex-wrap">
                     <button
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      onClick={() => {
+                        const newPage = Math.max(1, page - 1);
+                        setPage(newPage);
+                        // Update URL with new page
+                        const params = new URLSearchParams(searchParams.toString());
+                        params.set("page", newPage.toString());
+                        router.push(`/teachers/find-students?${params.toString()}`, { scroll: false });
+                      }}
                       disabled={page === 1}
                       className="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
                     >
@@ -241,7 +425,13 @@ export default function FindStudentsPage() {
                       return (
                         <button
                           key={pageNum}
-                          onClick={() => setPage(pageNum)}
+                          onClick={() => {
+                            setPage(pageNum);
+                            // Update URL with new page
+                            const params = new URLSearchParams(searchParams.toString());
+                            params.set("page", pageNum.toString());
+                            router.push(`/teachers/find-students?${params.toString()}`, { scroll: false });
+                          }}
                           className={`px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base ${
                             page === pageNum
                               ? "bg-indigo-600 text-white"
@@ -253,7 +443,14 @@ export default function FindStudentsPage() {
                       );
                     })}
                     <button
-                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      onClick={() => {
+                        const newPage = Math.min(totalPages, page + 1);
+                        setPage(newPage);
+                        // Update URL with new page
+                        const params = new URLSearchParams(searchParams.toString());
+                        params.set("page", newPage.toString());
+                        router.push(`/teachers/find-students?${params.toString()}`, { scroll: false });
+                      }}
                       disabled={page === totalPages}
                       className="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
                     >
