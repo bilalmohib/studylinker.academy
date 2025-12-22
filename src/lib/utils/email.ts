@@ -117,12 +117,13 @@ async function sendEmailViaSendGrid(options: EmailOptions) {
 /**
  * Send email via SMTP (using nodemailer)
  */
-async function sendEmailViaSMTP(options: EmailOptions) {
+async function sendEmailViaSMTP(options: EmailOptions): Promise<{ success: boolean; error?: string }> {
   // This would require nodemailer package
-  // For now, we'll throw an error suggesting to use Resend or SendGrid
-  throw new Error(
-    "SMTP email sending requires nodemailer package. Please use Resend or SendGrid instead, or install nodemailer: npm install nodemailer"
-  );
+  // For now, we'll return an error suggesting to use Resend or SendGrid
+  return {
+    success: false,
+    error: "SMTP email sending requires nodemailer package. Please use Resend or SendGrid instead, or install nodemailer: npm install nodemailer"
+  };
 }
 
 /**

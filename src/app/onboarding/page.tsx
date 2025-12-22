@@ -77,24 +77,6 @@ export default function OnboardingPage() {
     checkProfile();
   }, [userId, isLoaded, router, user]);
 
-  // Additional check: if no userId after loading, redirect to signup
-  useEffect(() => {
-    if (isLoaded && !userId) {
-      router.push("/sign-up");
-    }
-  }, [isLoaded, userId, router]);
-
-  // Redirect to signup if no user after loading
-  useEffect(() => {
-    if (isLoaded && !userId) {
-      router.push("/sign-up");
-    }
-  }, [isLoaded, userId, router]);
-    };
-
-    checkProfile();
-  }, [userId, isLoaded, router, user]);
-
   const handleRoleSelection = (selectedRole: "PARENT" | "TEACHER") => {
     setRole(selectedRole);
   };
