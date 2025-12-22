@@ -12,6 +12,8 @@ import {
   BsEye,
   BsCheck,
   BsX,
+  BsPencil,
+  BsSave,
 } from "react-icons/bs";
 import toast from "react-hot-toast";
 import { useAuth } from "@clerk/nextjs";
@@ -78,6 +80,9 @@ export default function AdminTeacherApplicationsPage() {
     interviewLink: "",
     interviewNotes: "",
   });
+  const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
+  const [autoGenerateMeeting, setAutoGenerateMeeting] = useState(true);
+  const [generatedMeetingLink, setGeneratedMeetingLink] = useState<string | null>(null);
   const [scoreData, setScoreData] = useState({
     interviewScore: "",
     maxInterviewScore: "100",
@@ -86,6 +91,12 @@ export default function AdminTeacherApplicationsPage() {
   const [rejectData, setRejectData] = useState({
     rejectionReason: "",
     adminNotes: "",
+  });
+  const [isEditingInterview, setIsEditingInterview] = useState(false);
+  const [editInterviewData, setEditInterviewData] = useState({
+    interviewScheduledAt: "",
+    interviewLink: "",
+    interviewNotes: "",
   });
 
   useEffect(() => {
@@ -170,28 +181,102 @@ export default function AdminTeacherApplicationsPage() {
     }
   };
 
+  const handleGenerateDescription = async () => {
+    if (!selectedApplication || !interviewData.interviewScheduledAt) {
+      toast.error("Please select interview date and time first");
+      return;
+    }
+
+    setIsGeneratingDescription(true);
+    try {
+      const response = await fetch("/api/generate-meeting-description", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          teacherName: `${selectedApplication.UserProfile.firstName} ${selectedApplication.UserProfile.lastName}`,
+          interviewDate: interviewData.interviewScheduledAt,
+          subjects: selectedApplication.subjects,
+          levels: selectedApplication.levels,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.details || errorData.error || "Failed to generate description");
+      }
+
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(data.details || data.error);
+      }
+      
+      setInterviewData((prev) => ({
+        ...prev,
+        interviewNotes: data.description,
+      }));
+      toast.success("Meeting description generated successfully!");
+    } catch (error) {
+      console.error("Error generating description:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to generate meeting description. Please try again.";
+      toast.error(errorMessage);
+    } finally {
+      setIsGeneratingDescription(false);
+    }
+  };
+
   const handleScheduleInterview = async () => {
     if (!selectedApplication) return;
 
-    if (!interviewData.interviewScheduledAt || !interviewData.interviewLink) {
-      toast.error("Please fill in all required fields");
+    if (!interviewData.interviewScheduledAt) {
+      toast.error("Please select interview date and time");
+      return;
+    }
+
+    if (!autoGenerateMeeting && !interviewData.interviewLink) {
+      toast.error("Please provide a meeting link or enable auto-generation");
       return;
     }
 
     try {
+      // Convert datetime-local format to ISO 8601 format
+      const dateTimeValue = interviewData.interviewScheduledAt;
+      const isoDateTime = dateTimeValue ? new Date(dateTimeValue).toISOString() : "";
+
       const result = await scheduleInterview({
         id: selectedApplication.id,
-        interviewScheduledAt: interviewData.interviewScheduledAt,
-        interviewLink: interviewData.interviewLink,
+        interviewScheduledAt: isoDateTime,
+        interviewLink: autoGenerateMeeting ? null : interviewData.interviewLink || null,
         interviewNotes: interviewData.interviewNotes || null,
       });
 
-      if (result.success) {
-        toast.success("Interview scheduled successfully");
-        setShowInterviewModal(false);
+      if (result.success && "data" in result) {
+        const meetingLink = result.data.interviewLink;
+        if (meetingLink) {
+          setGeneratedMeetingLink(meetingLink);
+          toast.success(
+            `Interview scheduled successfully! Email sent to teacher. Meeting Link: ${meetingLink}`,
+            { duration: 10000 }
+          );
+        } else {
+          toast.success("Interview scheduled successfully! Email sent to teacher.");
+        }
+        // Show meeting link in modal before closing
+        if (meetingLink) {
+          // Keep modal open for 3 seconds to show the link, then close
+          setTimeout(() => {
+            setShowInterviewModal(false);
+            setSelectedApplication(null);
+            setGeneratedMeetingLink(null);
+          }, 3000);
+        } else {
+          setShowInterviewModal(false);
+          setSelectedApplication(null);
+        }
         setInterviewData({ interviewScheduledAt: "", interviewLink: "", interviewNotes: "" });
+        setAutoGenerateMeeting(true);
         fetchApplications();
-        setSelectedApplication(null);
       } else {
         toast.error("error" in result ? result.error : "Failed to schedule interview");
       }
@@ -479,9 +564,60 @@ export default function AdminTeacherApplicationsPage() {
             <div className="bg-white rounded-2xl p-8 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-gray-900">Application Details</h2>
-                <Button onClick={() => setSelectedApplication(null)} variant="ghost" size="sm">
-                  <BsX className="w-5 h-5" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  {selectedApplication.interviewScheduledAt && (
+                    <Button
+                      onClick={() => {
+                        if (isEditingInterview) {
+                          setIsEditingInterview(false);
+                          // Reset edit data
+                          setEditInterviewData({
+                            interviewScheduledAt: "",
+                            interviewLink: "",
+                            interviewNotes: "",
+                          });
+                        } else {
+                          // Initialize edit data with current values
+                          const date = selectedApplication.interviewScheduledAt
+                            ? new Date(selectedApplication.interviewScheduledAt).toISOString().slice(0, 16)
+                            : "";
+                          setEditInterviewData({
+                            interviewScheduledAt: date,
+                            interviewLink: selectedApplication.interviewLink || "",
+                            interviewNotes: selectedApplication.interviewNotes || "",
+                          });
+                          setIsEditingInterview(true);
+                        }
+                      }}
+                      variant="outline"
+                      size="sm"
+                      className="whitespace-nowrap shrink-0 transition-all duration-200"
+                    >
+                      {isEditingInterview ? (
+                        <>
+                          <BsX className="w-4 h-4 mr-2 shrink-0" />
+                          Cancel
+                        </>
+                      ) : (
+                        <>
+                          <BsPencil className="w-4 h-4 mr-2 shrink-0" />
+                          Edit Interview
+                        </>
+                      )}
+                    </Button>
+                  )}
+                  <Button 
+                    onClick={() => {
+                      setSelectedApplication(null);
+                      setIsEditingInterview(false);
+                    }} 
+                    variant="ghost" 
+                    size="sm"
+                    className="shrink-0"
+                  >
+                    <BsX className="w-5 h-5" />
+                  </Button>
+                </div>
               </div>
               <div className="space-y-6">
                 <div>
@@ -550,19 +686,201 @@ export default function AdminTeacherApplicationsPage() {
                 )}
                 {selectedApplication.interviewScheduledAt && (
                   <div>
-                    <h3 className="font-semibold text-gray-900 mb-2">Interview Scheduled</h3>
-                    <p className="text-gray-700">
-                      {new Date(selectedApplication.interviewScheduledAt).toLocaleString()}
-                    </p>
-                    {selectedApplication.interviewLink && (
-                      <a
-                        href={selectedApplication.interviewLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-indigo-600 hover:text-indigo-700 underline"
-                      >
-                        Interview Link
-                      </a>
+                    <h3 className="font-semibold text-gray-900 mb-3">Interview Scheduled</h3>
+                    
+                    {isEditingInterview ? (
+                      // Edit Mode
+                      <div className="space-y-4">
+                        {/* Meeting Title */}
+                        <div>
+                          <p className="text-sm font-semibold text-gray-700 mb-1">Meeting Title:</p>
+                          <p className="text-gray-900 font-medium">
+                            Interview - {selectedApplication.UserProfile.firstName} {selectedApplication.UserProfile.lastName}
+                          </p>
+                        </div>
+
+                        {/* Interview Date & Time */}
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Date & Time *
+                          </label>
+                          <input
+                            type="datetime-local"
+                            value={editInterviewData.interviewScheduledAt}
+                            onChange={(e) =>
+                              setEditInterviewData((prev) => ({
+                                ...prev,
+                                interviewScheduledAt: e.target.value,
+                              }))
+                            }
+                            required
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                          />
+                        </div>
+
+                        {/* Meeting Description */}
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Meeting Description
+                          </label>
+                          <textarea
+                            value={editInterviewData.interviewNotes}
+                            onChange={(e) =>
+                              setEditInterviewData((prev) => ({
+                                ...prev,
+                                interviewNotes: e.target.value,
+                              }))
+                            }
+                            rows={6}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                            placeholder="Enter meeting description..."
+                          />
+                        </div>
+
+                        {/* Meeting Link */}
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Meeting Link
+                          </label>
+                          <input
+                            type="url"
+                            value={editInterviewData.interviewLink}
+                            onChange={(e) =>
+                              setEditInterviewData((prev) => ({
+                                ...prev,
+                                interviewLink: e.target.value,
+                              }))
+                            }
+                            placeholder="https://meet.google.com/..."
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Enter a Google Meet link or any other meeting platform URL
+                          </p>
+                        </div>
+
+                        {/* Save Button */}
+                        <div className="flex gap-2 pt-2">
+                          <Button
+                            onClick={async () => {
+                              if (!selectedApplication) return;
+                              if (!editInterviewData.interviewScheduledAt) {
+                                toast.error("Please select interview date and time");
+                                return;
+                              }
+
+                              try {
+                                // Convert datetime-local format to ISO 8601 format
+                                const isoDateTime = new Date(editInterviewData.interviewScheduledAt).toISOString();
+
+                                const result = await scheduleInterview({
+                                  id: selectedApplication.id,
+                                  interviewScheduledAt: isoDateTime,
+                                  interviewLink: editInterviewData.interviewLink || null,
+                                  interviewNotes: editInterviewData.interviewNotes || null,
+                                });
+
+                                if (result.success) {
+                                  toast.success("Interview details updated successfully!");
+                                  setIsEditingInterview(false);
+                                  fetchApplications();
+                                  // Refresh the selected application
+                                  const appResult = await getTeacherApplication(selectedApplication.id);
+                                  if (appResult.success && "data" in appResult) {
+                                    setSelectedApplication(appResult.data as Application);
+                                  }
+                                } else {
+                                  toast.error("error" in result ? result.error : "Failed to update interview details");
+                                }
+                              } catch (error) {
+                                console.error("Error updating interview:", error);
+                                toast.error("An error occurred while updating interview details");
+                              }
+                            }}
+                            className="flex-1"
+                          >
+                            <BsSave className="w-4 h-4 mr-2" />
+                            Save Changes
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              setIsEditingInterview(false);
+                              setEditInterviewData({
+                                interviewScheduledAt: "",
+                                interviewLink: "",
+                                interviewNotes: "",
+                              });
+                            }}
+                            variant="outline"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      // View Mode
+                      <>
+                        {/* Meeting Title */}
+                        <div className="mb-3">
+                          <p className="text-sm font-semibold text-gray-700 mb-1">Meeting Title:</p>
+                          <p className="text-gray-900 font-medium">
+                            Interview - {selectedApplication.UserProfile.firstName} {selectedApplication.UserProfile.lastName}
+                          </p>
+                        </div>
+
+                        {/* Interview Date & Time */}
+                        <div className="mb-3">
+                          <p className="text-sm font-semibold text-gray-700 mb-1">Date & Time:</p>
+                          <p className="text-gray-700">
+                            {new Date(selectedApplication.interviewScheduledAt).toLocaleString("en-US", {
+                              weekday: "long",
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                        </div>
+
+                        {/* Meeting Description */}
+                        {selectedApplication.interviewNotes && (
+                          <div className="mb-3">
+                            <p className="text-sm font-semibold text-gray-700 mb-1">Meeting Description:</p>
+                            <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                              <p className="text-gray-700 whitespace-pre-wrap text-sm">
+                                {selectedApplication.interviewNotes}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Meeting Link */}
+                        <div className="mt-4">
+                          <p className="text-sm font-semibold text-gray-700 mb-2">Meeting Link:</p>
+                          {selectedApplication.interviewLink ? (
+                            <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-200">
+                              <a
+                                href={selectedApplication.interviewLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-indigo-600 hover:text-indigo-700 underline break-all font-medium block mb-2"
+                              >
+                                {selectedApplication.interviewLink}
+                              </a>
+                              <p className="text-xs text-gray-500">
+                                Click the link above to join the Google Meet interview
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                              <p className="text-yellow-800 text-sm mb-3">
+                                ⚠️ Meeting link not available. Click "Edit Interview" to add a meeting link manually.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </>
                     )}
                   </div>
                 )}
@@ -618,27 +936,67 @@ export default function AdminTeacherApplicationsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Interview Link (Zoom, Google Meet, etc.) *
-                  </label>
-                  <input
-                    type="url"
-                    value={interviewData.interviewLink}
-                    onChange={(e) =>
-                      setInterviewData((prev) => ({
-                        ...prev,
-                        interviewLink: e.target.value,
-                      }))
-                    }
-                    placeholder="https://..."
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                  />
+                  <div className="flex items-center gap-2 mb-2">
+                    <input
+                      type="checkbox"
+                      id="autoGenerateMeeting"
+                      checked={autoGenerateMeeting}
+                      onChange={(e) => setAutoGenerateMeeting(e.target.checked)}
+                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                    />
+                    <label htmlFor="autoGenerateMeeting" className="text-sm font-semibold text-gray-700">
+                      Automatically create Google Meet link
+                    </label>
+                  </div>
+                  {!autoGenerateMeeting && (
+                    <input
+                      type="url"
+                      value={interviewData.interviewLink}
+                      onChange={(e) =>
+                        setInterviewData((prev) => ({
+                          ...prev,
+                          interviewLink: e.target.value,
+                        }))
+                      }
+                      placeholder="https://meet.google.com/..."
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 mt-2"
+                    />
+                  )}
+                  {autoGenerateMeeting && (
+                    <p className="text-sm text-gray-500 mt-1">
+                      A Google Meet link will be automatically created and sent via email
+                    </p>
+                  )}
+                  {generatedMeetingLink && (
+                    <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <p className="text-sm font-semibold text-green-800 mb-1">Generated Meeting Link:</p>
+                      <a
+                        href={generatedMeetingLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-green-700 underline break-all hover:text-green-900"
+                      >
+                        {generatedMeetingLink}
+                      </a>
+                    </div>
+                  )}
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Notes
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-semibold text-gray-700">
+                      Interview Notes / Description
+                    </label>
+                    <Button
+                      type="button"
+                      onClick={handleGenerateDescription}
+                      disabled={isGeneratingDescription || !interviewData.interviewScheduledAt}
+                      variant="outline"
+                      size="sm"
+                      className="text-xs"
+                    >
+                      {isGeneratingDescription ? "Generating..." : "✨ Generate with AI"}
+                    </Button>
+                  </div>
                   <textarea
                     value={interviewData.interviewNotes}
                     onChange={(e) =>
@@ -647,7 +1005,8 @@ export default function AdminTeacherApplicationsPage() {
                         interviewNotes: e.target.value,
                       }))
                     }
-                    rows={3}
+                    rows={4}
+                    placeholder="Enter interview notes or description. Click 'Generate with AI' to auto-generate."
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
@@ -659,6 +1018,8 @@ export default function AdminTeacherApplicationsPage() {
                     onClick={() => {
                       setShowInterviewModal(false);
                       setInterviewData({ interviewScheduledAt: "", interviewLink: "", interviewNotes: "" });
+                      setAutoGenerateMeeting(true);
+                      setGeneratedMeetingLink(null);
                     }}
                     variant="outline"
                   >

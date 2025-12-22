@@ -46,7 +46,7 @@ const updateApplicationStatusSchema = z.object({
 const scheduleInterviewSchema = z.object({
   id: idSchema,
   interviewScheduledAt: z.string().datetime(),
-  interviewLink: z.string().url(),
+  interviewLink: z.string().url().optional().nullable(),
   interviewNotes: z.string().optional().nullable(),
 });
 
@@ -438,12 +438,60 @@ export async function scheduleInterview(
       throw new UnauthorizedError("Admin access required");
     }
 
+    // Get application with user details for email
+    const { data: applicationData } = await (supabase
+      .from("TeacherApplication")
+      .select(`
+        *,
+        UserProfile:userId (
+          id,
+          firstName,
+          lastName,
+          email
+        )
+      `)
+      .eq("id", validated.id)
+      .single() as unknown as Promise<{ data: any | null; error: any }>);
+
+    if (!applicationData) {
+      throw new NotFoundError("Teacher application");
+    }
+
+    let meetingLink = validated.interviewLink;
+
+    // Create Google Meet meeting if link not provided
+    if (!meetingLink) {
+      try {
+        const meetResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/create-google-meet`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            meetingTitle: `Interview - ${applicationData.UserProfile?.firstName || "Teacher"} ${applicationData.UserProfile?.lastName || ""}`,
+            startTime: validated.interviewScheduledAt,
+          }),
+        });
+
+        if (meetResponse.ok) {
+          const meetData = await meetResponse.json();
+          meetingLink = meetData.meetingUri || meetData.meetingCode 
+            ? `https://meet.google.com/${meetData.meetingCode || meetData.meetingUri.split("/").pop()}`
+            : null;
+        }
+      } catch (error) {
+        console.error("Error creating Google Meet meeting:", error);
+        // Continue without meeting link if creation fails
+      }
+    }
+
+    // Update application
     const updateQuery = (supabase
       .from("TeacherApplication") as any)
       .update({
         status: "INTERVIEW_SCHEDULED",
         interviewScheduledAt: validated.interviewScheduledAt,
-        interviewLink: validated.interviewLink,
+        interviewLink: meetingLink || validated.interviewLink,
         interviewNotes: validated.interviewNotes || null,
         reviewedBy: user.id,
         reviewedAt: new Date().toISOString(),
@@ -456,6 +504,29 @@ export async function scheduleInterview(
 
     if (error) {
       throw new ValidationError(error.message);
+    }
+
+    // Send email notification to teacher
+    if (applicationData.UserProfile?.email && meetingLink) {
+      try {
+        const { generateInterviewInvitationEmail, sendEmail } = await import("@/lib/utils/email");
+        
+        const emailHtml = generateInterviewInvitationEmail(
+          `${applicationData.UserProfile.firstName} ${applicationData.UserProfile.lastName}`,
+          validated.interviewScheduledAt,
+          meetingLink,
+          validated.interviewNotes || undefined
+        );
+
+        await sendEmail({
+          to: applicationData.UserProfile.email,
+          subject: `Interview Invitation - StudyLinker Academy`,
+          html: emailHtml,
+        });
+      } catch (error) {
+        console.error("Error sending email:", error);
+        // Don't fail the entire operation if email fails
+      }
     }
 
     return { success: true, data: application };
