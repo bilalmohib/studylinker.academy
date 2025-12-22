@@ -567,7 +567,9 @@ export default function AdminTeacherApplicationsPage() {
                 <div className="flex items-center gap-2">
                   {selectedApplication.interviewScheduledAt && (
                     <Button
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
                         if (isEditingInterview) {
                           setIsEditingInterview(false);
                           // Reset edit data
@@ -591,16 +593,17 @@ export default function AdminTeacherApplicationsPage() {
                       }}
                       variant="outline"
                       size="sm"
-                      className="whitespace-nowrap shrink-0 transition-all duration-200"
+                      className="whitespace-nowrap shrink-0"
+                      style={{ overflow: 'clip' }}
                     >
                       {isEditingInterview ? (
                         <>
-                          <BsX className="w-4 h-4 mr-2 shrink-0" />
+                          <BsX className="w-4 h-4 shrink-0" />
                           Cancel
                         </>
                       ) : (
                         <>
-                          <BsPencil className="w-4 h-4 mr-2 shrink-0" />
+                          <BsPencil className="w-4 h-4 shrink-0" />
                           Edit Interview
                         </>
                       )}
