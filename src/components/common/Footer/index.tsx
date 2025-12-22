@@ -49,11 +49,11 @@ const Footer = ({ className }: FooterProps) => {
     >
       <Container>
         <div className="border-b border-[#C7C7C7] border-solid">
-          <div className="flex flex-col lg:flex-row lg:justify-between py-8 sm:py-10 lg:py-12 gap-8 lg:gap-0">
+          <div className="flex flex-col lg:flex-row lg:justify-between py-8 sm:py-10 lg:py-12 gap-8 lg:gap-10">
             <div className="w-full lg:w-3/12 flex flex-col items-center lg:items-start">
-              <div className="flex flex-col gap-6 sm:gap-8 lg:gap-12 items-center lg:items-start">
+              <div className="flex flex-col gap-3 sm:gap-4 lg:gap-6 items-center lg:items-start">
                 <FooterLogo />
-                <p className="text-[#464646] text-sm leading-relaxed max-w-xs text-center lg:text-left">
+                <p className="text-[#464646] text-[15px] md:text-base lg:text-xl leading-[142%] font-inter font-normal max-w-sm lg:max-w-xs text-center lg:text-left py-2 lg:py-3">
                   Connecting students and parents with qualified teachers
                   worldwide. Trust-first, parent-controlled tuition marketplace.
                 </p>

@@ -57,7 +57,7 @@ function Navbar() {
           </div>
 
           {/* Desktop Navigation - Hidden on mobile, shown at 1366px+ */}
-          <div className="hidden min-[1366px]:block flex-1 mx-8">
+          <div className="hidden min-[1366px]:flex flex-1 justify-center">
             {isMounted ? <NavItems /> : <div aria-hidden="true" />}
           </div>
 
@@ -108,7 +108,7 @@ function Navbar() {
         <Container>
           <div className="bg-white border-t border-gray-200 shadow-lg">
             <div
-              className={`px-4 pt-4 pb-6 transform transition-all duration-300 ease-out ${
+              className={`pt-4 pb-6 transform transition-all duration-300 ease-out ${
                 isMobileMenuOpen
                   ? "translate-y-0 opacity-100"
                   : "-translate-y-4 opacity-0"
