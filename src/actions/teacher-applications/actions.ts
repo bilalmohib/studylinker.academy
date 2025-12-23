@@ -478,6 +478,34 @@ export async function scheduleInterview(
       throw new ValidationError(error.message);
     }
 
+    // Automatically send email notification to teacher
+    if (applicationData.UserProfile?.email && validated.interviewLink) {
+      try {
+        const { generateInterviewInvitationEmail, sendEmail } = await import("@/lib/utils/email");
+        
+        const emailHtml = generateInterviewInvitationEmail(
+          `${applicationData.UserProfile.firstName || ""} ${applicationData.UserProfile.lastName || ""}`.trim() || "Teacher",
+          validated.interviewScheduledAt,
+          validated.interviewLink,
+          validated.interviewNotes || undefined
+        );
+
+        const emailResult = await sendEmail({
+          to: applicationData.UserProfile.email,
+          subject: `Interview Invitation - StudyLinker Academy`,
+          html: emailHtml,
+        });
+
+        if (!emailResult.success) {
+          console.error("Failed to send interview email:", emailResult.error);
+          // Don't fail the entire operation if email fails, but log it
+        }
+      } catch (emailError) {
+        console.error("Error sending interview email:", emailError);
+        // Don't fail the entire operation if email fails, but log it
+      }
+    }
+
     return { success: true, data: application };
   } catch (error) {
     return { success: false, ...handleError(error) };
